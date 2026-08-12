@@ -44,9 +44,10 @@ function Index() {
 
           <span className="float-note left-6 top-1/2 sm:left-12">Open today</span>
           <span className="float-note right-8 top-[38%] sm:right-16">Nearby: 18 lenders</span>
-          <span className="float-note bottom-40 left-1/2 -translate-x-1/2 font-hand !text-lg !tracking-normal !normal-case sm:!text-xl">
+          <span className="ink-soft absolute bottom-40 left-1/2 -translate-x-1/2 -rotate-1 font-hand text-2xl sm:text-3xl">
             the mohalla is awake
           </span>
+
 
           <p className="absolute inset-x-0 bottom-14 text-center font-mono text-[9px] leading-relaxed tracking-[0.3em] uppercase text-hero-tag sm:bottom-20 sm:text-[11px]">
             Borrow it. Return it. Keep the mohalla moving.
