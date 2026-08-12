@@ -146,9 +146,9 @@
 /* --- Mohalla Store: photographic editorial interface --- */
 
 @theme inline {
-  --font-hand: "Caveat", cursive;
-  --font-mono: "Space Mono", ui-monospace, monospace;
-  --font-display: "Archivo", system-ui, sans-serif;
+  --font-hand: "Parisienne", cursive;
+  --font-mono: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, serif;
   --color-hero-tag: var(--hero-tag);
   --color-hero-deep: var(--hero-deep);
   --color-panel-note: var(--panel-note);
@@ -275,11 +275,55 @@
 
 .display-xl {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  line-height: 1.02;
+  font-size: clamp(2.2rem, 5.6vw, 4.4rem);
+}
+
+.plate-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  font-size: clamp(1.6rem, 3.6vw, 2.6rem);
+  color: oklch(0.97 0.01 250);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-weight: 300;
+  font-size: 10px;
+  letter-spacing: 0.42em;
   text-transform: uppercase;
-  letter-spacing: -0.03em;
-  line-height: 0.9;
-  font-size: clamp(2.4rem, 6.5vw, 5rem);
+}
+
+.scan-line {
+  color: oklch(0.88 0.16 92);
+  font-family: var(--font-mono);
+  font-weight: 300;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.chat-bubble {
+  border-radius: 18px;
+  padding: 10px 14px;
+  font-family: var(--font-mono);
+  font-weight: 300;
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 82%;
+}
+.chat-bubble.me {
+  background: oklch(0.88 0.16 92 / 0.16);
+  border: 1px solid oklch(0.88 0.16 92 / 0.28);
+  align-self: flex-end;
+}
+.chat-bubble.them {
+  background: oklch(0.95 0.01 250 / 0.07);
+  border: 1px solid oklch(0.9 0.02 250 / 0.12);
+  align-self: flex-start;
 }
 
 .ink-field {
@@ -306,4 +350,13 @@
   gap: 2px;
   border-bottom: 1px dashed oklch(0.9 0.03 240 / 0.14);
   padding-bottom: 10px;
+}
+
+.panel-stage {
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease;
+  will-change: transform, opacity;
+}
+
+.ink-link.is-on {
+  color: oklch(0.88 0.16 92);
 }
