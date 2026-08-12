@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import heroAsset from "@/assets/mohalla-hero.png.asset.json";
+import heroAsset from "@/assets/mohalla-hero.png";
 import TopAnnotations from "@/components/TopAnnotations";
 import PanelHeader from "@/components/PanelHeader";
 import BorrowerPanel from "@/components/BorrowerPanel";
 import LenderPanel from "@/components/LenderPanel";
+import BorrowedProfile from "@/components/BorrowedProfile";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -49,12 +50,142 @@ function Index() {
   const [mode, setMode] = useState("borrower");
   const p = useScrollProgress();
 
+  // Authentication State
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("mohalla_user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [activeTab, setActiveTab] = useState("content"); // "content" | "profile"
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState("login"); // "login" | "register"
+  const [authTriggerMsg, setAuthTriggerMsg] = useState("");
+
+  // Modal Inputs
+  const [usernameValue, setUsernameValue] = useState("");
+  const [passwordValue, setPasswordValue] = useState("");
+  const [phoneValue, setPhoneValue] = useState("");
+  const [areaValue, setAreaValue] = useState("");
+  const [shelfNameValue, setShelfNameValue] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const handleAuthRequired = (reasonMessage) => {
+    setAuthTriggerMsg(reasonMessage);
+    setAuthMode("login");
+    setShowAuthModal(true);
+  };
+
+  const handleBorrowSuccess = (itemName) => {
+    // Show a modern notification (native alert is fine for simplicity here, or customized banner)
+    alert(`Success! You have borrowed a "${itemName}". Checking your personal profile...`);
+    setActiveTab("profile");
+  };
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+    const u = usernameValue.trim();
+    const p = passwordValue;
+    if (!u || p.length < 3) {
+      setErrorMsg("Username and password (min 3 characters) required.");
+      return;
+    }
+    const endpoint = authMode === "login" ? "login" : "register";
+    try {
+      const res = await fetch(`http://localhost:8085/api/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: u, password: p }),
+      });
+      if (res.ok) {
+        if (authMode === "login") {
+          const data = await res.json();
+          const userSession = { username: data.username, token: data.token };
+          localStorage.setItem("mohalla_user", JSON.stringify(userSession));
+          setCurrentUser(userSession);
+          setShowAuthModal(false);
+          setActiveTab("content"); // Direct back to main panel view where they can search or toggle lender/borrower panels
+          setUsernameValue("");
+          setPasswordValue("");
+          setAuthTriggerMsg("");
+        } else {
+          setSuccessMsg("Shelf created! Please customize your profile below.");
+          setAuthMode("setup");
+          setPasswordValue("");
+        }
+      } else {
+        const text = await res.text();
+        setErrorMsg(text || "Authentication request failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Cannot establish connection to local Go server.");
+    }
+  };
+
+  const handleSetupSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+    const phone = phoneValue.trim();
+    const area = areaValue.trim();
+    const shelfName = shelfNameValue.trim();
+    if (!phone || !area || !shelfName) {
+      setErrorMsg("All profile fields are required to activate your Mohalla shelf.");
+      return;
+    }
+    try {
+      const res = await fetch("http://localhost:8085/api/setup_profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: usernameValue.trim(),
+          phone,
+          area,
+          shelfName,
+        }),
+      });
+      if (res.ok) {
+        // Log them in!
+        const userSession = { username: usernameValue.trim(), token: usernameValue.trim() };
+        localStorage.setItem("mohalla_user", JSON.stringify(userSession));
+        setCurrentUser(userSession);
+
+        // Close auth modal and redirect to homepage glass morphed area
+        setShowAuthModal(false);
+        setActiveTab("content");
+
+        // Clear values
+        setUsernameValue("");
+        setPasswordValue("");
+        setPhoneValue("");
+        setAreaValue("");
+        setShelfNameValue("");
+        setAuthTriggerMsg("");
+        setErrorMsg("");
+        setSuccessMsg("");
+      } else {
+        const text = await res.text();
+        setErrorMsg(text || "Failed to setup profile details.");
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Cannot establish connection to local Go server.");
+    }
+  };
+
   return (
     <main className="relative bg-hero-deep">
       <div className="relative">
         <div className="sticky top-0 h-screen overflow-hidden">
           <img
-            src={heroAsset.url}
+            src={heroAsset}
             alt="A lit-up neighbourhood store under a big tree on a rainy blue evening"
             className="h-full w-full object-cover"
           />
@@ -62,11 +193,11 @@ function Index() {
 
           <TopAnnotations mode={mode} setMode={setMode} />
 
-          <span className="ink-soft absolute bottom-40 left-1/2 -translate-x-1/2 font-hand text-3xl sm:text-4xl">
+          <span className="ink-soft absolute bottom-40 left-1/2 -translate-x-1/2 font-hand text-4xl sm:text-5xl">
             the mohalla is awake
           </span>
 
-          <p className="absolute inset-x-0 bottom-14 text-center font-mono text-[9px] font-light uppercase leading-relaxed tracking-[0.42em] text-hero-tag sm:bottom-20 sm:text-[11px]">
+          <p className="absolute inset-x-0 bottom-14 text-center font-mono text-[13px] font-light uppercase leading-relaxed tracking-[0.42em] text-hero-tag sm:bottom-20 sm:text-[16px]">
             Borrow it. Return it. Keep the mohalla moving.
           </p>
         </div>
@@ -83,11 +214,72 @@ function Index() {
           }}
         >
           <div className="grain" aria-hidden="true" />
-          <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-28 sm:px-12 sm:pt-24">
+          <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-28 sm:px-12 sm:pt-28">
+            
+            {/* Top Left corner of the glass panel: Padosi ID */}
+            {currentUser && (
+              <div className="absolute left-6 top-6 z-40 sm:left-12 sm:top-8">
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-yellow-400">
+                  PADOSI ID: <strong className="text-yellow-300 font-bold">{currentUser.username}</strong>
+                </span>
+              </div>
+            )}
+
+            {/* Top Right corner of the glass panel: Profile and session details */}
+            <div className="absolute right-6 top-6 z-40 sm:right-12 sm:top-8">
+              {currentUser ? (
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(activeTab === "profile" ? "content" : "profile")}
+                    className="ink-link font-mono text-[10px] font-light uppercase tracking-[0.3em] border border-panel-line px-3 py-1 hover:border-white transition-colors"
+                  >
+                    {activeTab === "profile" ? "Search / Shelf" : "My Profile"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.removeItem("mohalla_user");
+                      setCurrentUser(null);
+                      setActiveTab("content");
+                    }}
+                    className="font-mono text-[10px] font-light uppercase tracking-[0.28em] text-red-400/80 hover:text-red-300 transition-colors"
+                  >
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthTriggerMsg("");
+                    setAuthMode("login");
+                    setShowAuthModal(true);
+                  }}
+                  className="ink-link font-mono text-[10px] font-light uppercase tracking-[0.28em] border border-panel-line px-4 py-1.5 hover:border-white transition-colors"
+                >
+                  Join / Sign In
+                </button>
+              )}
+            </div>
+
             <PanelHeader />
 
-            <div className="mt-14">
-              {mode === "borrower" ? <BorrowerPanel /> : <LenderPanel />}
+            <div className="mt-36 sm:mt-48">
+              {activeTab === "profile" ? (
+                <BorrowedProfile currentUser={currentUser} />
+              ) : mode === "borrower" ? (
+                <BorrowerPanel
+                  currentUser={currentUser}
+                  onAuthRequired={handleAuthRequired}
+                  onBorrowSuccess={handleBorrowSuccess}
+                />
+              ) : (
+                <LenderPanel
+                  currentUser={currentUser}
+                  onAuthRequired={handleAuthRequired}
+                />
+              )}
             </div>
 
             <div className="mt-24 flex flex-wrap items-center justify-between gap-4 border-t border-panel-line pt-8 font-mono text-[10px] font-light uppercase tracking-[0.32em] text-panel-note">
@@ -97,6 +289,325 @@ function Index() {
           </div>
         </section>
       </div>
+
+      {/* Brown Parchment Receipt Modal overlay */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 animate-fade-in">
+          <div className="relative w-full max-w-sm animate-fade-in">
+            
+            {/* The Close Button above the receipt */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowAuthModal(false);
+                setUsernameValue("");
+                setPasswordValue("");
+                setErrorMsg("");
+                setSuccessMsg("");
+              }}
+              className="absolute -top-10 right-0 text-white hover:text-red-300 transition-colors text-xs font-mono tracking-widest z-50"
+              aria-label="Close"
+            >
+              ✕ CLOSE
+            </button>
+
+            {/* Top Zigzag Edge */}
+            <div className="receipt-edge-top absolute -top-[12px] left-0 right-0" />
+
+            {/* Receipt Card */}
+            <div className="receipt-card">
+              {authMode === "login" ? (
+                <>
+                  {/* Header */}
+                  <div className="text-center font-mono border-b border-dashed border-neutral-400 pb-3">
+                    <h3 className="font-display text-2xl font-bold tracking-tight text-neutral-800">
+                      MOHALLA STORE
+                    </h3>
+                    <p className="text-[9px] uppercase tracking-widest text-neutral-600 mt-1">
+                      lending terminal #03
+                    </p>
+                    <p className="text-[8px] text-neutral-500 mt-0.5">
+                      date: 12 aug // time: active
+                    </p>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="mt-2 text-center text-xs text-red-700 bg-red-50 border border-red-200 p-2 font-mono">
+                      {errorMsg}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAuthSubmit} className="mt-4 space-y-4 font-mono">
+                    <div>
+                      <div className="mb-1">
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-neutral-700">
+                          username
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="eg Mahek"
+                        value={usernameValue}
+                        onChange={(e) => setUsernameValue(e.target.value)}
+                        className="receipt-field placeholder:text-neutral-500 placeholder:text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1">
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-neutral-700">
+                          password
+                        </span>
+                      </div>
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={passwordValue}
+                        onChange={(e) => setPasswordValue(e.target.value)}
+                        className="receipt-field"
+                      />
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        className="w-full bg-neutral-900 text-[#cfbda3] font-mono text-xs uppercase tracking-widest py-3 hover:bg-black transition-colors text-center border-b-2 border-black"
+                      >
+                        Open Shelf →
+                      </button>
+                    </div>
+                  </form>
+
+                  <div className="mt-4 text-center font-mono border-t border-dashed border-neutral-400 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setErrorMsg("");
+                        setSuccessMsg("");
+                        setAuthMode("register");
+                      }}
+                      className="text-[10px] uppercase tracking-wider text-neutral-600 hover:text-neutral-800 underline"
+                    >
+                      New user? Create a shelf
+                    </button>
+
+                    {/* Receipt Barcode */}
+                    <div className="flex justify-center items-center gap-[2px] opacity-75 mt-3">
+                      <div className="w-[2px] h-6 bg-neutral-800" />
+                      <div className="w-[1px] h-6 bg-neutral-800" />
+                      <div className="w-[3px] h-6 bg-neutral-800" />
+                      <div className="w-[1px] h-6 bg-neutral-800" />
+                      <div className="w-[2px] h-6 bg-neutral-800" />
+                      <div className="w-[4px] h-6 bg-neutral-800" />
+                      <div className="w-[1px] h-6 bg-neutral-800" />
+                      <div className="w-[2px] h-6 bg-neutral-800" />
+                      <div className="w-[1px] h-6 bg-neutral-800" />
+                    </div>
+                  </div>
+                </>
+              ) : authMode === "register" ? (
+                <>
+                  {/* Header */}
+                  <div className="text-center font-mono border-b border-dashed border-neutral-400 pb-3">
+                    <h3 className="font-display text-2xl font-bold tracking-tight text-neutral-800">
+                      JOIN MOHALLA
+                    </h3>
+                    <p className="text-[9px] uppercase tracking-widest text-neutral-600 mt-1">
+                      new shelf registry
+                    </p>
+                    <p className="text-[8px] text-neutral-500 mt-0.5">
+                      date: 12 aug // time: active
+                    </p>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="mt-2 text-center text-xs text-red-700 bg-red-50 border border-red-200 p-2 font-mono">
+                      {errorMsg}
+                    </div>
+                  )}
+                  {successMsg && (
+                    <div className="mt-2 text-center text-xs text-green-700 bg-green-50 border border-green-200 p-2 font-mono">
+                      {successMsg}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAuthSubmit} className="mt-4 space-y-4 font-mono">
+                    <div>
+                      <div className="mb-1">
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-neutral-700">
+                          username
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="eg Mahek"
+                        value={usernameValue}
+                        onChange={(e) => setUsernameValue(e.target.value)}
+                        className="receipt-field placeholder:text-neutral-500 placeholder:text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1">
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-neutral-700">
+                          password
+                        </span>
+                      </div>
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={passwordValue}
+                        onChange={(e) => setPasswordValue(e.target.value)}
+                        className="receipt-field"
+                      />
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        className="w-full bg-neutral-900 text-[#cfbda3] font-mono text-xs uppercase tracking-widest py-3 hover:bg-black transition-colors text-center border-b-2 border-black"
+                      >
+                        Create Shelf →
+                      </button>
+                    </div>
+                  </form>
+
+                  <div className="mt-4 text-center font-mono border-t border-dashed border-neutral-400 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setErrorMsg("");
+                        setSuccessMsg("");
+                        setAuthMode("login");
+                      }}
+                      className="text-[10px] uppercase tracking-wider text-neutral-600 hover:text-neutral-800 underline"
+                    >
+                      Registered already? Switch to Sign In
+                    </button>
+
+                    {/* Receipt Barcode */}
+                    <div className="flex justify-center items-center gap-[2px] opacity-75 mt-3">
+                      <div className="w-[3px] h-6 bg-neutral-800" />
+                      <div className="w-[1px] h-6 bg-neutral-800" />
+                      <div className="w-[2px] h-6 bg-neutral-800" />
+                      <div className="w-[1.5px] h-6 bg-neutral-800" />
+                      <div className="w-[3px] h-6 bg-neutral-800" />
+                      <div className="w-[4px] h-6 bg-neutral-800" />
+                      <div className="w-[1px] h-6 bg-neutral-800" />
+                      <div className="w-[2px] h-6 bg-neutral-800" />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Header */}
+                  <div className="text-center font-mono border-b border-dashed border-neutral-400 pb-3">
+                    <h3 className="font-display text-2xl font-bold tracking-tight text-neutral-800">
+                      MOHALLA PROFILE
+                    </h3>
+                    <p className="text-[9px] uppercase tracking-widest text-neutral-600 mt-1">
+                      customize your active shelf
+                    </p>
+                    <p className="text-[8px] text-neutral-500 mt-0.5">
+                      owner identity: {usernameValue}
+                    </p>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="mt-2 text-center text-xs text-red-700 bg-red-50 border border-red-200 p-2 font-mono">
+                      {errorMsg}
+                    </div>
+                  )}
+                  {successMsg && (
+                    <div className="mt-2 text-center text-xs text-green-700 bg-green-50 border border-green-200 p-2 font-mono">
+                      {successMsg}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSetupSubmit} className="mt-4 space-y-4 font-mono">
+                    <div>
+                      <div className="mb-1">
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-neutral-700">
+                          phone number
+                        </span>
+                      </div>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="eg 9876543210"
+                        value={phoneValue}
+                        onChange={(e) => setPhoneValue(e.target.value)}
+                        className="receipt-field placeholder:text-neutral-500 placeholder:text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1">
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-[#27211a]">
+                          location / area
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="eg Gali 4, Sector C"
+                        value={areaValue}
+                        onChange={(e) => setAreaValue(e.target.value)}
+                        className="receipt-field placeholder:text-neutral-500 placeholder:text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-1">
+                        <span className="text-[10px] uppercase font-bold tracking-widest text-neutral-700">
+                          shelf title
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="eg Mahek's Tool Shed"
+                        value={shelfNameValue}
+                        onChange={(e) => setShelfNameValue(e.target.value)}
+                        className="receipt-field placeholder:text-neutral-500 placeholder:text-xs"
+                      />
+                    </div>
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        className="w-full bg-neutral-900 text-[#cfbda3] font-mono text-xs uppercase tracking-widest py-3 hover:bg-black transition-colors text-center border-b-2 border-black"
+                      >
+                        Activate Shelf →
+                      </button>
+                    </div>
+                  </form>
+
+                  <div className="mt-4 text-center font-mono border-t border-dashed border-neutral-400 pt-3">
+                    {/* Receipt Barcode */}
+                    <div className="flex justify-center items-center gap-[2px] opacity-75 mt-1">
+                      <div className="w-[1px] h-6 bg-neutral-800" />
+                      <div className="w-[3px] h-6 bg-neutral-800" />
+                      <div className="w-[1px] h-6 bg-neutral-800" />
+                      <div className="w-[5px] h-6 bg-neutral-800" />
+                      <div className="w-[2px] h-6 bg-neutral-800" />
+                      <div className="w-[1px] h-6 bg-neutral-800" />
+                      <div className="w-[4px] h-6 bg-neutral-800" />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Bottom Zigzag Edge */}
+            <div className="receipt-edge-bottom absolute -bottom-[12px] left-0 right-0" />
+          </div>
+        </div>
+      )}
     </main>
   );
 }

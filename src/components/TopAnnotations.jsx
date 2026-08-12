@@ -17,11 +17,11 @@ export default function TopAnnotations({ mode, setMode }) {
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-5 pt-6 sm:px-10 sm:pt-8">
-      <div className="ink-soft font-display text-lg tracking-[0.28em] sm:text-xl">
+      <div className="ink-soft font-mono text-2xl font-semibold tracking-[0.16em] sm:text-3xl">
         {time ?? "\u00a0"}
       </div>
 
-      <div className="pointer-events-auto flex items-center gap-3 font-mono text-[10px] font-light uppercase tracking-[0.34em] sm:text-[11px]">
+      <div className="pointer-events-auto flex items-center gap-3 font-mono text-xs font-light uppercase tracking-[0.34em] sm:text-sm">
         <button
           type="button"
           onClick={() => setMode("borrower")}
@@ -29,10 +29,10 @@ export default function TopAnnotations({ mode, setMode }) {
         >
           Borrower
         </button>
-        <span className="mode-track" aria-hidden="true">
+        <span className="mode-track" aria-hidden="true" style={{ width: "24px" }}>
           <span
             className="mode-dot"
-            style={{ transform: mode === "borrower" ? "translateX(0)" : "translateX(14px)" }}
+            style={{ transform: mode === "borrower" ? "translateX(0)" : "translateX(18px)" }}
           />
         </span>
         <button
