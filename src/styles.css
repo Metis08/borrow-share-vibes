@@ -142,3 +142,168 @@
     color: var(--color-foreground);
   }
 }
+
+/* --- Mohalla Store: photographic editorial interface --- */
+
+@theme inline {
+  --font-hand: "Caveat", cursive;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+  --font-display: "Archivo", system-ui, sans-serif;
+  --color-hero-tag: var(--hero-tag);
+  --color-hero-deep: var(--hero-deep);
+  --color-panel-note: var(--panel-note);
+  --color-panel-line: var(--panel-line);
+}
+
+:root {
+  --hero-deep: oklch(0.16 0.03 250);
+  --hero-tag: oklch(0.93 0.02 90 / 0.78);
+  --panel-note: oklch(0.85 0.02 240 / 0.6);
+  --panel-line: oklch(0.9 0.02 240 / 0.12);
+  --panel-glass: oklch(0.18 0.035 255 / 0.62);
+}
+
+.ink-soft {
+  color: oklch(0.97 0.02 90 / 0.85);
+  text-shadow: 0 1px 12px oklch(0.15 0.03 250 / 0.6);
+}
+
+.ink-link {
+  color: oklch(0.97 0.02 90 / 0.72);
+  text-shadow: 0 1px 12px oklch(0.15 0.03 250 / 0.6);
+  transition: color 0.25s ease, transform 0.25s ease;
+  position: relative;
+}
+.ink-link:hover {
+  color: oklch(1 0.03 95);
+  transform: translateY(-1px);
+}
+.ink-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0) rotate(-0.6deg);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+.ink-link:hover::after {
+  transform: scaleX(1) rotate(-0.6deg);
+}
+
+.mode-word {
+  color: oklch(0.97 0.02 90 / 0.45);
+  text-shadow: 0 1px 12px oklch(0.15 0.03 250 / 0.6);
+  transition: color 0.3s ease, letter-spacing 0.3s ease;
+  letter-spacing: 0.22em;
+}
+.mode-word:hover {
+  color: oklch(0.97 0.02 90 / 0.8);
+}
+.mode-word.is-active {
+  color: oklch(1 0.04 95);
+}
+
+.mode-track {
+  position: relative;
+  display: inline-block;
+  width: 20px;
+  height: 6px;
+}
+.mode-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: oklch(0.9 0.13 85);
+  box-shadow: 0 0 10px oklch(0.9 0.13 85 / 0.8);
+  transition: transform 0.45s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: oklch(0.8 0.16 150);
+  box-shadow: 0 0 8px oklch(0.8 0.16 150 / 0.9);
+  animation: pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.hero-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, oklch(0.15 0.03 250 / 0.45), transparent 30%),
+    linear-gradient(to top, oklch(0.14 0.03 250 / 0.7), transparent 45%);
+  pointer-events: none;
+}
+
+.float-note {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: oklch(0.97 0.02 90 / 0.72);
+  text-shadow: 0 1px 14px oklch(0.14 0.03 250 / 0.75);
+  pointer-events: none;
+}
+
+.glass-sheet {
+  background: var(--panel-glass);
+  backdrop-filter: blur(28px) saturate(120%);
+  border-top: 1px solid oklch(0.9 0.03 240 / 0.14);
+  border-radius: 40px 40px 0 0;
+  box-shadow: 0 -40px 90px oklch(0.1 0.03 250 / 0.55);
+  color: oklch(0.96 0.01 250);
+  overflow: hidden;
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  pointer-events: none;
+  background-image: radial-gradient(oklch(1 0 0) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+}
+
+.display-xl {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  line-height: 0.9;
+  font-size: clamp(2.4rem, 6.5vw, 5rem);
+}
+
+.ink-field {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid oklch(0.9 0.03 240 / 0.3);
+  padding: 0.4rem 0 0.6rem;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  color: oklch(0.98 0.01 250);
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+.ink-field::placeholder {
+  color: oklch(0.85 0.02 240 / 0.4);
+}
+.ink-field:focus {
+  border-color: oklch(0.9 0.13 85 / 0.7);
+}
+
+.scatter-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px dashed oklch(0.9 0.03 240 / 0.14);
+  padding-bottom: 10px;
+}
