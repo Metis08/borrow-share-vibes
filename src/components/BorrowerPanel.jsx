@@ -1,25 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { scanActiveLenders, formatKm, CATALOGUE } from "@/lib/lenders";
 import BorrowedProfile from "@/components/BorrowedProfile";
-
-function useLenderScan() {
-  const [phase, setPhase] = useState(0);
-  const lenders = useMemo(() => scanActiveLenders(5), []);
-  useEffect(() => {
-    const a = setTimeout(() => setPhase(1), 700);
-    const b = setTimeout(() => setPhase(2), 1600);
-    return () => {
-      clearTimeout(a);
-      clearTimeout(b);
-    };
-  }, []);
-  return { phase, lenders };
-}
 
 export default function BorrowerPanel() {
   const [q, setQ] = useState("");
   const [view, setView] = useState("search");
-  const { lenders } = useLenderScan();
+  const lenders = useMemo(() => scanActiveLenders(5), []);
 
   const results = useMemo(() => {
     const t = q.trim().toLowerCase();
