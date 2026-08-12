@@ -9,7 +9,7 @@ const SHELF = [
 export default function LenderPanel() {
   return (
     <div>
-      <p className="font-hand text-lg text-panel-note sm:text-2xl">
+      <p className="font-hand text-2xl text-panel-note sm:text-3xl">
         your stuff could be doing more than collecting dust.
       </p>
 
@@ -20,13 +20,13 @@ export default function LenderPanel() {
             <br />
             around?
           </h2>
-          <a href="#shelf" className="ink-link mt-6 inline-block font-mono text-[11px] tracking-[0.24em] uppercase">
+          <a href="#shelf" className="ink-link mt-6 inline-block font-mono text-[11px] font-light tracking-[0.32em] uppercase">
             Go to your lending profile →
           </a>
         </div>
 
         <div id="shelf" className="lg:pt-6">
-          <p className="font-mono text-[10px] tracking-[0.24em] uppercase text-panel-note">
+          <p className="font-mono text-[10px] font-light tracking-[0.3em] uppercase text-panel-note">
             on your shelf — 5 things
           </p>
           <ul className="mt-7 space-y-6">
@@ -40,14 +40,14 @@ export default function LenderPanel() {
                   animationDelay: `${i * 70}ms`,
                 }}
               >
-                <span className="font-hand text-2xl">{item.name}</span>
-                <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-panel-note">
+                <span className="font-display text-2xl tracking-wide">{item.name}</span>
+                <span className="font-mono text-[10px] font-light tracking-[0.28em] uppercase text-panel-note">
                   {item.state}
                 </span>
               </li>
             ))}
           </ul>
-          <p className="mt-10 font-hand text-xl text-panel-note">
+          <p className="mt-10 font-hand text-2xl text-panel-note">
             add one more thing to the shelf →
           </p>
         </div>

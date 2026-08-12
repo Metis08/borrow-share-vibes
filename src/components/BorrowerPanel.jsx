@@ -19,7 +19,7 @@ function useLenderScan() {
 export default function BorrowerPanel() {
   const [q, setQ] = useState("");
   const [view, setView] = useState("search");
-  const { phase, lenders } = useLenderScan();
+  const { lenders } = useLenderScan();
 
   const results = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -33,33 +33,22 @@ export default function BorrowerPanel() {
 
   return (
     <div>
-      <header className="text-center">
-        <h1 className="plate-title font-display">मोहल्ला स्टोर</h1>
-        <p className="scan-line mt-4">
-          {phase === 0
-            ? "scanning your mohalla…"
-            : phase === 1
-              ? `matching ${lenders.length * 3} shelves within 5 km…`
-              : `${lenders.length} lenders active near you · closest ${formatKm(lenders[0].km)}`}
-        </p>
-
-        <nav className="mt-7 flex items-center justify-center gap-8 font-mono text-[10px] font-light uppercase tracking-[0.34em] text-panel-note">
-          <button
-            type="button"
-            onClick={() => setView("search")}
-            className={view === "search" ? "text-foreground/90 ink-link" : "ink-link"}
-          >
-            Search
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("profile")}
-            className={view === "profile" ? "text-foreground/90 ink-link" : "ink-link"}
-          >
-            My profile
-          </button>
-        </nav>
-      </header>
+      <nav className="flex items-center justify-center gap-8 font-mono text-[10px] font-light uppercase tracking-[0.34em] text-panel-note">
+        <button
+          type="button"
+          onClick={() => setView("search")}
+          className={view === "search" ? "ink-link is-on" : "ink-link"}
+        >
+          Search
+        </button>
+        <button
+          type="button"
+          onClick={() => setView("profile")}
+          className={view === "profile" ? "ink-link is-on" : "ink-link"}
+        >
+          My profile
+        </button>
+      </nav>
 
       {view === "profile" ? (
         <div className="mt-16">
