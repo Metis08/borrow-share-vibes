@@ -31,7 +31,7 @@ function Index() {
 
   return (
     <main className="relative bg-hero-deep">
-      <div className="relative h-[210vh]">
+      <div className="relative">
         <div className="sticky top-0 h-screen overflow-hidden">
           <img
             src={heroAsset.url}
@@ -53,7 +53,10 @@ function Index() {
           </p>
         </div>
 
-        <section id="panel" className="glass-sheet relative z-30 -mt-[42vh] min-h-screen">
+        <div className="h-[45vh]" aria-hidden="true" />
+
+        <section id="panel" className="glass-sheet relative z-30 min-h-screen">
+
           <div className="grain" aria-hidden="true" />
           <div className="relative mx-auto max-w-6xl px-6 pt-20 pb-28 sm:px-12 sm:pt-28">
             {mode === "borrower" ? <BorrowerPanel /> : <LenderPanel />}
