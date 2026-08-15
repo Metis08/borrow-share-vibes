@@ -12,7 +12,7 @@ function useClock() {
   return time;
 }
 
-export default function TopAnnotations({ mode, setMode }) {
+export default function TopAnnotations({ onRadarClick }) {
   const time = useClock();
 
   return (
@@ -21,26 +21,14 @@ export default function TopAnnotations({ mode, setMode }) {
         {time ?? "\u00a0"}
       </div>
 
-      <div className="pointer-events-auto flex items-center gap-3 font-mono text-xs font-light uppercase tracking-[0.34em] sm:text-sm">
+      <div className="pointer-events-auto flex items-center font-mono text-[10px] font-bold uppercase tracking-[0.25em] sm:text-xs">
         <button
           type="button"
-          onClick={() => setMode("borrower")}
-          className={mode === "borrower" ? "mode-word is-active" : "mode-word"}
+          onClick={onRadarClick}
+          className="flex items-center gap-2 text-white/50 hover:text-white transition-colors duration-200 cursor-pointer"
         >
-          Borrower
-        </button>
-        <span className="mode-track" aria-hidden="true" style={{ width: "24px" }}>
-          <span
-            className="mode-dot"
-            style={{ transform: mode === "borrower" ? "translateX(0)" : "translateX(18px)" }}
-          />
-        </span>
-        <button
-          type="button"
-          onClick={() => setMode("lender")}
-          className={mode === "lender" ? "mode-word is-active" : "mode-word"}
-        >
-          Lender
+          <span style={{ color: "oklch(0.65 0.25 137)" }} className="animate-pulse text-xs sm:text-sm">◉</span>
+          MOHALLA RADAR
         </button>
       </div>
     </div>

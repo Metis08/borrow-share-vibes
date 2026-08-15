@@ -415,3 +415,44 @@
   font-family: "Cormorant Garamond", Georgia, serif !important;
   font-style: italic !important;
 }
+
+/* Casual, modern, playful brush script (Caveat) as requested by user image */
+.font-caveat {
+  font-family: "Caveat", cursive !important;
+}
+
+.font-cedarville {
+  font-family: "Cedarville Cursive", cursive !important;
+}
+
+.font-homemade {
+  font-family: "Homemade Apple", cursive !important;
+}
+
+.font-zeyada {
+  font-family: "Zeyada", cursive !important;
+}
+
+/* Unique organic wobbly blob buttons for a fun, non-standard look */
+.btn-fun-blob-1 {
+  border-radius: 65% 35% 55% 45% / 45% 55% 35% 65% !important;
+}
+.btn-fun-blob-1:hover {
+  border-radius: 45% 55% 35% 65% / 65% 35% 55% 45% !important;
+}
+
+.btn-fun-blob-2 {
+  border-radius: 35% 65% 45% 55% / 55% 45% 65% 35% !important;
+}
+.btn-fun-blob-2:hover {
+  border-radius: 55% 45% 65% 35% / 35% 65% 45% 55% !important;
+}
+
+/* Custom dark teal glowing map blueprint overlay style */
+.grey-map-base {
+  filter: none !important;
+}
+
+.teal-map-labels {
+  filter: sepia(100%) hue-rotate(130deg) saturate(1000%) brightness(1.3) contrast(140%) !important;
+}

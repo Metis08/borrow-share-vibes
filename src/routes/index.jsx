@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import heroAsset from "@/assets/mohalla-hero.png";
 import TopAnnotations from "@/components/TopAnnotations";
 import PanelHeader from "@/components/PanelHeader";
 import BorrowerPanel from "@/components/BorrowerPanel";
 import LenderPanel from "@/components/LenderPanel";
 import BorrowedProfile from "@/components/BorrowedProfile";
+import MohallaRadar from "@/components/MohallaRadar";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -48,6 +49,7 @@ function useScrollProgress() {
 
 function Index() {
   const [mode, setMode] = useState("borrower");
+  const [panelView, setPanelView] = useState("welcome");
   const p = useScrollProgress();
 
   // Authentication State
@@ -74,6 +76,112 @@ function Index() {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
+  // Radar & Geolocation States
+  const [locationSharingEnabled, setLocationSharingEnabled] = useState(false);
+  const [userCoords, setUserCoords] = useState(null); // { lat, lng }
+  const [currentPage, setCurrentPage] = useState("store"); // "store" | "radar"
+
+  // Sync location opt-in & coords from profile
+  useEffect(() => {
+    const fetchLocationStatus = async () => {
+      if (!currentUser) {
+        setLocationSharingEnabled(false);
+        setUserCoords(null);
+        return;
+      }
+      try {
+        const res = await fetch("http://localhost:8085/api/profile", {
+          headers: {
+            "Authorization": `Bearer ${currentUser.token}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setLocationSharingEnabled(data.locationSharingEnabled || false);
+          if (data.latitude && data.longitude) {
+            setUserCoords({ lat: data.latitude, lng: data.longitude });
+          } else {
+            setUserCoords(null);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading location details:", err);
+      }
+    };
+    fetchLocationStatus();
+  }, [currentUser]);
+
+  const saveUserCoordinates = async (lat, lng) => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch("http://localhost:8085/api/user/location", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${currentUser.token}`,
+        },
+        body: JSON.stringify({
+          locationSharingEnabled: true,
+          latitude: lat,
+          longitude: lng,
+        }),
+      });
+      if (res.ok) {
+        setLocationSharingEnabled(true);
+        setUserCoords({ lat, lng });
+      }
+    } catch (err) {
+      console.error("Error saving user location coordinates:", err);
+    }
+  };
+
+  const requestLocationForRadar = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        saveUserCoordinates(lat, lng);
+      },
+      () => {
+        alert("Location access denied by browser.");
+      }
+    );
+  };
+
+  const handleRadarClick = () => {
+    setCurrentPage("radar");
+
+    if (currentUser) {
+      if (locationSharingEnabled) {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const lat = pos.coords.latitude;
+              const lng = pos.coords.longitude;
+              saveUserCoordinates(lat, lng);
+            },
+            () => {}
+          );
+        }
+      } else {
+        requestLocationForRadar();
+      }
+    } else {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          },
+          () => {}
+        );
+      }
+    }
+  };
+
   const handleAuthRequired = (reasonMessage) => {
     setAuthTriggerMsg(reasonMessage);
     setAuthMode("login");
@@ -81,7 +189,6 @@ function Index() {
   };
 
   const handleBorrowSuccess = (itemName) => {
-    // Show a modern notification (native alert is fine for simplicity here, or customized banner)
     alert(`Success! You have borrowed a "${itemName}". Checking your personal profile...`);
     setActiveTab("profile");
   };
@@ -180,8 +287,22 @@ function Index() {
     }
   };
 
+  if (currentPage === "radar") {
+    return (
+      <MohallaRadar
+        currentUser={currentUser}
+        onAuthRequired={handleAuthRequired}
+        onBorrowSuccess={handleBorrowSuccess}
+        initialLocationSharing={locationSharingEnabled}
+        initialLat={userCoords?.lat}
+        initialLng={userCoords?.lng}
+        onBack={() => setCurrentPage("store")}
+      />
+    );
+  }
+
   return (
-    <main className="relative bg-hero-deep">
+    <main className="relative bg-[#060a12] text-white">
       <div className="relative">
         <div className="sticky top-0 h-screen overflow-hidden">
           <img
@@ -191,13 +312,15 @@ function Index() {
           />
           <div className="hero-vignette" aria-hidden="true" />
 
-          <TopAnnotations mode={mode} setMode={setMode} />
+          <TopAnnotations 
+            onRadarClick={handleRadarClick} 
+          />
 
-          <span className="ink-soft absolute bottom-40 left-1/2 -translate-x-1/2 font-hand text-4xl sm:text-5xl">
+          <span className="ink-soft absolute bottom-28 sm:bottom-40 left-1/2 -translate-x-1/2 font-hand text-3xl sm:text-5xl whitespace-nowrap">
             the mohalla is awake
           </span>
 
-          <p className="absolute inset-x-0 bottom-14 text-center font-mono text-[13px] font-light uppercase leading-relaxed tracking-[0.42em] text-hero-tag sm:bottom-20 sm:text-[16px]">
+          <p className="absolute inset-x-0 bottom-10 sm:bottom-20 text-center font-mono text-[10px] sm:text-[13px] md:text-[16px] font-light uppercase leading-relaxed tracking-[0.22em] sm:tracking-[0.42em] text-hero-tag px-4 max-w-md sm:max-w-none mx-auto">
             Borrow it. Return it. Keep the mohalla moving.
           </p>
         </div>
@@ -214,6 +337,7 @@ function Index() {
           }}
         >
           <div className="grain" aria-hidden="true" />
+          
           <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-28 sm:px-12 sm:pt-28">
             
             {/* Top Left corner of the glass panel: Padosi ID */}
@@ -231,7 +355,10 @@ function Index() {
                 <div className="flex items-center gap-4">
                   <button
                     type="button"
-                    onClick={() => setActiveTab(activeTab === "profile" ? "content" : "profile")}
+                    onClick={() => {
+                      setActiveTab(activeTab === "profile" ? "content" : "profile");
+                      setPanelView("active");
+                    }}
                     className="ink-link font-mono text-[10px] font-light uppercase tracking-[0.3em] border border-panel-line px-3 py-1 hover:border-white transition-colors"
                   >
                     {activeTab === "profile" ? "Search / Shelf" : "My Profile"}
@@ -242,6 +369,7 @@ function Index() {
                       localStorage.removeItem("mohalla_user");
                       setCurrentUser(null);
                       setActiveTab("content");
+                      setPanelView("welcome");
                     }}
                     className="font-mono text-[10px] font-light uppercase tracking-[0.28em] text-red-400/80 hover:text-red-300 transition-colors"
                   >
@@ -265,20 +393,72 @@ function Index() {
 
             <PanelHeader />
 
-            <div className="mt-36 sm:mt-48">
+            <div className="mt-1 sm:mt-2">
               {activeTab === "profile" ? (
-                <BorrowedProfile currentUser={currentUser} />
+                <BorrowedProfile 
+                  currentUser={currentUser} 
+                  onLocationUpdated={(enabled, lat, lng) => {
+                    setLocationSharingEnabled(enabled);
+                    if (enabled) {
+                      setUserCoords({ lat, lng });
+                    } else {
+                      setUserCoords(null);
+                    }
+                  }} 
+                />
+              ) : panelView === "welcome" ? (
+                <div className="text-center max-w-4xl mx-auto px-4 py-8">
+                  {/* Headline */}
+                  <h2 className="font-zeyada text-3xl sm:text-[44px] font-normal tracking-wide text-white mb-6 leading-[1.3]">
+                    Jo chahiye, ho sakta hai bagal wale
+                    <br />
+                    ke paas ho.
+                  </h2>
+                  
+                  {/* Description */}
+                  <p className="font-mono text-sm sm:text-lg leading-relaxed text-panel-note max-w-2xl mx-auto mb-16 uppercase tracking-wider">
+                    Mohalla Store connects people living in the same neighbourhood, so they can borrow things they need and lend things they already have — because not everything needs to be bought new.
+                  </p>
+
+                  {/* Take a Peek Button */}
+                  <div className="flex justify-center items-center pointer-events-auto mb-6">
+                    <Link
+                      to="/peek"
+                      className="group relative px-10 py-3.5 rounded-none bg-white/[0.03] border border-white/30 hover:border-yellow-400 hover:bg-yellow-400 hover:text-black transition-all duration-300 shadow-xl cursor-pointer w-48 text-center text-white block"
+                    >
+                      <span className="font-mono text-[11px] uppercase tracking-[0.22em] font-medium block">
+                        Take a Peek
+                      </span>
+                    </Link>
+                  </div>
+                </div>
               ) : mode === "borrower" ? (
-                <BorrowerPanel
-                  currentUser={currentUser}
-                  onAuthRequired={handleAuthRequired}
-                  onBorrowSuccess={handleBorrowSuccess}
-                />
+                <div>
+                  <button 
+                    onClick={() => setPanelView("welcome")}
+                    className="mb-8 font-mono text-[10px] text-panel-note hover:text-white transition-colors tracking-widest uppercase flex items-center gap-2 cursor-pointer pb-2 border-b border-white/5 w-fit"
+                  >
+                    ← back to welcome info
+                  </button>
+                  <BorrowerPanel
+                    currentUser={currentUser}
+                    onAuthRequired={handleAuthRequired}
+                    onBorrowSuccess={handleBorrowSuccess}
+                  />
+                </div>
               ) : (
-                <LenderPanel
-                  currentUser={currentUser}
-                  onAuthRequired={handleAuthRequired}
-                />
+                <div>
+                  <button 
+                    onClick={() => setPanelView("welcome")}
+                    className="mb-8 font-mono text-[10px] text-panel-note hover:text-white transition-colors tracking-widest uppercase flex items-center gap-2 cursor-pointer pb-2 border-b border-white/5 w-fit"
+                  >
+                    ← back to welcome info
+                  </button>
+                  <LenderPanel
+                    currentUser={currentUser}
+                    onAuthRequired={handleAuthRequired}
+                  />
+                </div>
               )}
             </div>
 

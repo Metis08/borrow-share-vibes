@@ -12,6 +12,8 @@ export default function LenderPanel({ currentUser, onAuthRequired }) {
   const [shelfItems, setShelfItems] = useState(BASE_SHELF);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newItemName, setNewItemName] = useState("");
+  const [newItemCategory, setNewItemCategory] = useState("Other");
+  const [newItemDescription, setNewItemDescription] = useState("");
 
   const fetchLentItems = async () => {
     if (!currentUser) return;
@@ -26,7 +28,7 @@ export default function LenderPanel({ currentUser, onAuthRequired }) {
         // Map backend lent items structure to the UI display format
         const customItems = (data.lent || []).map((item) => ({
           name: item.itemName,
-          state: `ready to share · since today`,
+          state: `${item.category || "Other"} · ready to share`,
           tilt: (Math.random() - 0.5) * 4,
         }));
         setShelfItems([...BASE_SHELF, ...customItems]);
@@ -56,10 +58,16 @@ export default function LenderPanel({ currentUser, onAuthRequired }) {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${currentUser.token}`,
         },
-        body: JSON.stringify({ itemName }),
+        body: JSON.stringify({ 
+          itemName, 
+          category: newItemCategory, 
+          description: newItemDescription 
+        }),
       });
       if (res.ok) {
         setNewItemName("");
+        setNewItemCategory("Other");
+        setNewItemDescription("");
         setShowAddForm(false);
         fetchLentItems();
       } else {
@@ -110,15 +118,52 @@ export default function LenderPanel({ currentUser, onAuthRequired }) {
           </ul>
 
           {showAddForm ? (
-            <form onSubmit={handleAddShelfItem} className="mt-8 animate-fade-in">
-              <input
-                required
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-                placeholder="What item are you adding?"
-                className="ink-field font-display text-xl"
-                autoFocus
-              />
+            <form onSubmit={handleAddShelfItem} className="mt-8 animate-fade-in space-y-5">
+              <div>
+                <label className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#cfbda3]/75 block mb-1">
+                  Item Name
+                </label>
+                <input
+                  required
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  placeholder="What item are you adding?"
+                  className="ink-field font-display text-lg"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#cfbda3]/75 block mb-1">
+                  Category
+                </label>
+                <select
+                  value={newItemCategory}
+                  onChange={(e) => setNewItemCategory(e.target.value)}
+                  className="w-full bg-[#121c2c]/80 border border-white/10 text-white rounded px-3 py-2.5 font-mono text-xs uppercase tracking-wider focus:outline-none focus:border-yellow-400 mt-1 cursor-pointer"
+                >
+                  <option value="Electronics">Electronics</option>
+                  <option value="Tools">Tools</option>
+                  <option value="Books">Books</option>
+                  <option value="Home">Home</option>
+                  <option value="Outdoor">Outdoor</option>
+                  <option value="Events">Events</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#cfbda3]/75 block mb-1">
+                  Short Description
+                </label>
+                <input
+                  value={newItemDescription}
+                  onChange={(e) => setNewItemDescription(e.target.value)}
+                  placeholder="e.g. HDMI cable, return dry..."
+                  className="ink-field font-mono text-sm"
+                />
+              </div>
+
               <div className="mt-4 flex gap-4">
                 <button
                   type="submit"

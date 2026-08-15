@@ -34,11 +34,18 @@ const REPLIES = [
   "koi jaldi nahi, jab free ho tab.",
 ];
 
-export default function BorrowedProfile({ currentUser }) {
+export default function BorrowedProfile({ currentUser, onLocationUpdated }) {
   const [borrowedItems, setBorrowedItems] = useState(BASE_BORROWED);
   const [lentItems, setLentItems] = useState([]);
   const [openId, setOpenId] = useState("proj");
-  const [profileMeta, setProfileMeta] = useState({ phone: "", area: "", shelfName: "" });
+  const [profileMeta, setProfileMeta] = useState({ 
+    phone: "", 
+    area: "", 
+    shelfName: "",
+    locationSharingEnabled: false,
+    latitude: 0,
+    longitude: 0
+  });
   
   const [threads, setThreads] = useState(() =>
     Object.fromEntries(
@@ -79,7 +86,14 @@ export default function BorrowedProfile({ currentUser }) {
           phone: data.phone || "",
           area: data.area || "",
           shelfName: data.shelfName || "",
+          locationSharingEnabled: data.locationSharingEnabled || false,
+          latitude: data.latitude || 0,
+          longitude: data.longitude || 0,
         });
+
+        if (onLocationUpdated) {
+          onLocationUpdated(data.locationSharingEnabled || false, data.latitude || 0, data.longitude || 0);
+        }
       }
     } catch (err) {
       console.error("Error loading profile details:", err);
@@ -89,6 +103,65 @@ export default function BorrowedProfile({ currentUser }) {
   useEffect(() => {
     fetchProfileData();
   }, [currentUser]);
+
+  const toggleRadarSharing = async () => {
+    const nextEnabled = !profileMeta.locationSharingEnabled;
+    let lat = profileMeta.latitude;
+    let lng = profileMeta.longitude;
+
+    if (nextEnabled) {
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          lat = position.coords.latitude;
+          lng = position.coords.longitude;
+          await saveRadarSharing(true, lat, lng);
+        },
+        (error) => {
+          console.error(error);
+          alert("Location permission denied. Please allow location access to share coordinates on Mohalla Radar.");
+        }
+      );
+    } else {
+      await saveRadarSharing(false, 0, 0);
+    }
+  };
+
+  const saveRadarSharing = async (enabled, lat, lng) => {
+    try {
+      const res = await fetch("http://localhost:8085/api/user/location", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${currentUser.token}`,
+        },
+        body: JSON.stringify({
+          locationSharingEnabled: enabled,
+          latitude: lat,
+          longitude: lng,
+        }),
+      });
+      if (res.ok) {
+        setProfileMeta((prev) => ({
+          ...prev,
+          locationSharingEnabled: enabled,
+          latitude: lat,
+          longitude: lng,
+        }));
+        if (onLocationUpdated) {
+          onLocationUpdated(enabled, lat, lng);
+        }
+      } else {
+        alert("Failed to update radar sharing settings on server.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error updating location settings.");
+    }
+  };
 
   useEffect(() => {
     // Generate thread slots for newly loaded/added items
@@ -139,14 +212,30 @@ export default function BorrowedProfile({ currentUser }) {
               owner: {currentUser?.username}
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 font-mono text-[10px] uppercase tracking-wider text-panel-note bg-white/5 border border-white/10 px-4 py-3 rounded-sm">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 font-mono text-[10px] uppercase tracking-wider text-panel-note bg-white/5 border border-white/10 px-4 py-3 rounded-sm">
             <div>
               <span className="text-[#cfbda3]/70 block text-[8px] tracking-widest mb-0.5">phone:</span>
               <span className="text-white font-medium">{profileMeta.phone || "not registered"}</span>
             </div>
-            <div className="sm:border-l sm:border-white/10 sm:pl-8">
+            <div className="sm:border-l sm:border-white/10 sm:pl-6">
               <span className="text-[#cfbda3]/70 block text-[8px] tracking-widest mb-0.5">location/area:</span>
               <span className="text-white font-medium">{profileMeta.area || "mohalla center"}</span>
+            </div>
+            <div className="sm:border-l sm:border-white/10 sm:pl-6">
+              <span className="text-[#cfbda3]/70 block text-[8px] tracking-widest mb-0.5">radar sharing:</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <button
+                  type="button"
+                  onClick={toggleRadarSharing}
+                  className={`px-2 py-0.5 rounded text-[8px] tracking-widest uppercase transition-all font-bold cursor-pointer ${
+                    profileMeta.locationSharingEnabled
+                      ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                      : "bg-red-500/15 text-red-400 border border-red-500/30"
+                  }`}
+                >
+                  {profileMeta.locationSharingEnabled ? "Active" : "Disabled"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
