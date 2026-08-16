@@ -450,9 +450,55 @@
 
 /* Custom dark teal glowing map blueprint overlay style */
 .grey-map-base {
-  filter: none !important;
+  filter: sepia(100%) hue-rotate(150deg) saturate(160%) brightness(48%) contrast(125%) !important;
 }
 
 .teal-map-labels {
-  filter: sepia(100%) hue-rotate(130deg) saturate(1000%) brightness(1.3) contrast(140%) !important;
+  filter: sepia(100%) hue-rotate(130deg) saturate(600%) brightness(1.1) contrast(120%) !important;
+}
+
+/* Glassmorphic editorial zoom control elements override */
+.leaflet-bar {
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(13, 26, 42, 0.8) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+.leaflet-bar a {
+  background: transparent !important;
+  color: #cfbda3 !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  font-family: var(--font-mono) !important;
+  transition: all 0.25s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.leaflet-bar a:hover {
+  background: rgba(234, 179, 8, 0.2) !important;
+  color: #fff !important;
+}
+.leaflet-bar a:last-child {
+  border-bottom: none !important;
+}
+
+/* Card bottom edges gradually merge into the deep teal page bg using linear gradient and Webkit mask image */
+.dark-teal-glass-card {
+  background: linear-gradient(to bottom, rgba(15, 32, 59, 0.45) 0%, rgba(15, 32, 59, 0) 100%) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-left: 1px solid rgba(79, 195, 247, 0.08) !important;
+  border-right: 1px solid rgba(79, 195, 247, 0.08) !important;
+  border-top: 1px solid rgba(79, 195, 247, 0.15) !important;
+  border-bottom: none !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+  border-radius: 40px 40px 0 0 !important;
+  
+  /* Gradual visual fading mask */
+  mask-image: linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgba(0, 0, 0, 0.95) 60%, rgba(0, 0, 0, 0) 100%) !important;
+  -webkit-mask-image: linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgba(0, 0, 0, 0.95) 60%, rgba(0, 0, 0, 0) 100%) !important;
 }

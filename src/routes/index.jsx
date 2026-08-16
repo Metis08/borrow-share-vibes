@@ -312,9 +312,7 @@ function Index() {
           />
           <div className="hero-vignette" aria-hidden="true" />
 
-          <TopAnnotations 
-            onRadarClick={handleRadarClick} 
-          />
+          <TopAnnotations />
 
           <span className="ink-soft absolute bottom-28 sm:bottom-40 left-1/2 -translate-x-1/2 font-hand text-3xl sm:text-5xl whitespace-nowrap">
             the mohalla is awake
