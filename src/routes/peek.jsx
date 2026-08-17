@@ -22,6 +22,14 @@ function RepositoryOfRemnantsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeNavTab, setActiveNavTab] = useState("explore"); // "explore" | "stories" | "messages" | "profile"
+  const [showFlyer, setShowFlyer] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowFlyer(true);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Borrowing Form State inside Glass Panel
   const [borrowingItemKey, setBorrowingItemKey] = useState(null); // null or item key e.g. "radio"
@@ -280,7 +288,9 @@ function RepositoryOfRemnantsPage() {
                 setActiveNavTab("explore");
                 document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
               }}
-              className={`hover:text-white transition-colors cursor-pointer ${activeNavTab === "explore" ? "text-white font-semibold" : ""}`}
+              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                activeNavTab === "explore" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
+              }`}
             >
               Explore your Mohalla
             </button>
@@ -289,7 +299,9 @@ function RepositoryOfRemnantsPage() {
                 setActiveNavTab("stories");
                 document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
               }}
-              className={`hover:text-white transition-colors cursor-pointer ${activeNavTab === "stories" ? "text-[#facc15] font-semibold underline underline-offset-4" : ""}`}
+              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                activeNavTab === "stories" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
+              }`}
             >
               Mohalla Stories
             </button>
@@ -298,7 +310,9 @@ function RepositoryOfRemnantsPage() {
                 setActiveNavTab("messages");
                 document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
               }}
-              className="hover:text-white transition-colors cursor-pointer"
+              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                activeNavTab === "messages" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
+              }`}
             >
               Messages
             </button>
@@ -307,15 +321,17 @@ function RepositoryOfRemnantsPage() {
                 setActiveNavTab("profile");
                 document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
               }}
-              className="hover:text-white transition-colors cursor-pointer"
+              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                activeNavTab === "profile" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
+              }`}
             >
               Profile
             </button>
             <Link
               to="/radar"
-              className="text-teal-100 font-semibold bg-[#083842]/70 hover:bg-[#09414b] px-3.5 py-1.5 rounded-full border border-neutral-800 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+              className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
             >
-              <span>📡 Mohalla Radar</span>
+              Mohalla Radar
             </Link>
           </nav>
 
@@ -323,10 +339,9 @@ function RepositoryOfRemnantsPage() {
           <div className="flex items-center gap-4">
             <Link
               to="/lend"
-              className="bg-gradient-to-r from-[#09414b] via-[#083842] to-[#042028] hover:from-[#0c5360] hover:to-[#09414b] text-white font-semibold text-xs px-4 py-2 rounded-full flex items-center gap-1.5 border border-neutral-800 shadow-md transition-all cursor-pointer"
+              className="btn-peek-sm"
             >
-              <span className="text-sm font-bold leading-none">+</span>
-              <span>Lend Something</span>
+              + LEND SOMETHING
             </Link>
           </div>
         </header>
@@ -637,37 +652,41 @@ function RepositoryOfRemnantsPage() {
               <nav className="hidden md:flex items-center gap-8 text-xs font-medium tracking-wide text-neutral-300">
                 <button
                   onClick={() => setActiveNavTab("explore")}
-                  className={`hover:text-white transition-colors cursor-pointer ${
-                    activeNavTab === "explore" ? "text-white font-semibold" : ""
+                  className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                    activeNavTab === "explore" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
                   }`}
                 >
                   Explore your Mohalla
                 </button>
                 <button
                   onClick={() => setActiveNavTab("stories")}
-                  className={`hover:text-white transition-colors cursor-pointer ${
-                    activeNavTab === "stories" ? "text-[#facc15] font-semibold underline underline-offset-4" : ""
+                  className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                    activeNavTab === "stories" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
                   }`}
                 >
                   Mohalla Stories
                 </button>
                 <button
                   onClick={() => setActiveNavTab("messages")}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                    activeNavTab === "messages" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
+                  }`}
                 >
                   Messages
                 </button>
                 <button
                   onClick={() => setActiveNavTab("profile")}
-                  className="hover:text-white transition-colors cursor-pointer"
+                  className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                    activeNavTab === "profile" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
+                  }`}
                 >
                   Profile
                 </button>
                 <Link
                   to="/radar"
-                  className="text-teal-100 font-semibold bg-[#083842]/70 hover:bg-[#09414b] px-3.5 py-1.5 rounded-full border border-neutral-800 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
                 >
-                  <span>📡 Mohalla Radar</span>
+                  Mohalla Radar
                 </Link>
               </nav>
 
@@ -675,10 +694,9 @@ function RepositoryOfRemnantsPage() {
               <div className="flex items-center gap-4">
                 <Link
                   to="/lend"
-                  className="bg-gradient-to-r from-[#09414b] via-[#083842] to-[#042028] hover:from-[#0c5360] hover:to-[#09414b] text-white font-semibold text-xs px-4 py-2 rounded-full flex items-center gap-1.5 border border-neutral-800 shadow-md transition-all cursor-pointer"
+                  className="btn-peek-sm"
                 >
-                  <span className="text-sm font-bold leading-none">+</span>
-                  <span>Lend Something</span>
+                  + LEND SOMETHING
                 </Link>
 
                 <button
@@ -1109,9 +1127,9 @@ function RepositoryOfRemnantsPage() {
                                   {chat.tagline}
                                 </span>
                                 
-                                <div className="bg-[#191a1c] group-hover:bg-[#09414b] text-white border border-[#333438] group-hover:border-[#0c5360] text-xs font-bold py-2.5 px-4 rounded-xl flex items-center justify-between transition-all">
-                                  <span>Open 2-Way Chat</span>
-                                  <span>💬 ➔</span>
+                                <div className="btn-peek-sm w-full flex items-center justify-between mt-1">
+                                  <span>OPEN 2-WAY CHAT</span>
+                                  <span>➔</span>
                                 </div>
                               </div>
                             </div>
@@ -1426,9 +1444,9 @@ function RepositoryOfRemnantsPage() {
                         setBorrowingItemKey(null);
                         setBorrowRequestSent(false);
                       }}
-                      className="bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white px-4 py-2 rounded-full border border-neutral-700 text-xs font-mono transition-colors cursor-pointer flex items-center gap-2 shrink-0"
+                      className="btn-peek-sm"
                     >
-                      <span>←</span> Back to Store Items
+                      ← BACK TO STORE ITEMS
                     </button>
                     <div>
                       <div className="flex items-center gap-2 mb-0.5">
@@ -1466,9 +1484,9 @@ function RepositoryOfRemnantsPage() {
                           setBorrowRequestSent(false);
                           setActiveNavTab("messages");
                         }}
-                        className="bg-gradient-to-r from-[#0a3038] via-[#09414b] to-[#042028] hover:from-[#0c5360] hover:to-[#09414b] text-teal-100 border border-[#0c5360] font-bold text-xs px-6 py-3 rounded-full transition-all shadow-md cursor-pointer"
+                        className="btn-peek-sm"
                       >
-                        Go to Messages →
+                        GO TO MESSAGES →
                       </button>
                       <button
                         type="button"
@@ -1476,9 +1494,9 @@ function RepositoryOfRemnantsPage() {
                           setBorrowingItemKey(null);
                           setBorrowRequestSent(false);
                         }}
-                        className="bg-neutral-900 hover:bg-neutral-800 text-neutral-300 font-mono text-xs px-5 py-3 rounded-full border border-neutral-700 transition-colors cursor-pointer"
+                        className="btn-peek-sm"
                       >
-                        Keep Browsing
+                        KEEP BROWSING
                       </button>
                     </div>
                   </div>
@@ -1658,9 +1676,9 @@ function RepositoryOfRemnantsPage() {
                       <button
                         type="button"
                         onClick={() => setBorrowRequestSent(true)}
-                        className="w-full bg-gradient-to-r from-[#0a3038] via-[#09414b] to-[#042028] hover:from-[#0c5360] hover:to-[#09414b] text-teal-100 font-extrabold text-sm sm:text-base py-4 rounded-2xl transition-all border border-[#0c5360] shadow-md hover:scale-[1.01] cursor-pointer flex items-center justify-center gap-2"
+                        className="btn-peek w-full"
                       >
-                        <span>📩 Send Borrow Request to {itemDetails[borrowingItemKey].owner}</span>
+                        <span>SEND BORROW REQUEST TO {itemDetails[borrowingItemKey].owner.toUpperCase()}</span>
                       </button>
                     </div>
                   </div>
@@ -1698,9 +1716,9 @@ function RepositoryOfRemnantsPage() {
                       <button
                         type="button"
                         onClick={() => setBorrowingItemKey(activeItem)}
-                        className="bg-gradient-to-r from-[#09414b] via-[#083842] to-[#042028] hover:from-[#0c5360] hover:to-[#09414b] text-teal-100 font-semibold text-xs px-6 py-3 rounded-full border border-[#0c5360] transition-all shadow-md cursor-pointer"
+                        className="btn-peek-sm"
                       >
-                        Request to Borrow
+                        REQUEST TO BORROW
                       </button>
                     </div>
                   </div>
@@ -1833,6 +1851,48 @@ function RepositoryOfRemnantsPage() {
             </div>
           </footer>
         </section>
+
+        {/* 6. 5-SECOND FLYING AD FLYER OVERLAY (MOHALLA RULES) */}
+        {showFlyer && (
+          <div 
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md transition-all duration-500 animate-fadeIn"
+            onClick={() => setShowFlyer(false)}
+          >
+            <div 
+              className="relative max-w-md sm:max-w-lg w-full flex flex-col items-center animate-fly-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Top Close Cross Button */}
+              <button
+                type="button"
+                onClick={() => setShowFlyer(false)}
+                className="absolute -top-4 -right-4 sm:-top-5 sm:-right-5 w-11 h-11 rounded-full bg-[#1b4332] hover:bg-black text-[#f5e6c8] hover:text-white border-2 border-[#f5e6c8] flex items-center justify-center text-xl font-bold transition-all hover:scale-110 cursor-pointer shadow-2xl z-30"
+                aria-label="Close Rules Flyer"
+                title="Close Flyer"
+              >
+                ✕
+              </button>
+
+              {/* Flying Flyer Image */}
+              <div className="relative rounded-2xl overflow-hidden shadow-[0_30px_90px_rgba(0,0,0,0.9)] border-2 border-[#2d6a4f]/60 bg-[#0b2b1d]">
+                <img
+                  src="/mohalla-rules-flyer.jpg"
+                  alt="Mohalla Rules - Tum aye toh aya mujhe yaad"
+                  className="w-full max-h-[75vh] object-contain rounded-2xl"
+                />
+              </div>
+
+              {/* Bottom CTA Button */}
+              <button
+                type="button"
+                onClick={() => setShowFlyer(false)}
+                className="btn-peek mt-5 px-8 py-3 text-xs tracking-widest uppercase font-mono shadow-xl bg-[#1b4332] hover:bg-white text-white hover:text-black border border-[#2d6a4f] transition-all cursor-pointer"
+              >
+                SAMJH GAYA · GOT IT 👍
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     );
   }

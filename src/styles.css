@@ -507,3 +507,74 @@
   mask-image: linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgba(0, 0, 0, 0.95) 60%, rgba(0, 0, 0, 0) 100%) !important;
   -webkit-mask-image: linear-gradient(to bottom, rgb(0, 0, 0) 0%, rgba(0, 0, 0, 0.95) 60%, rgba(0, 0, 0, 0) 100%) !important;
 }
+
+/* --- Sharp Rectangular Outline Button (Matching User Reference Image) --- */
+.btn-peek {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #ffffff !important;
+  font-family: var(--font-mono), sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  padding: 0.75rem 1.75rem;
+  border-radius: 0px !important; /* Sharp rectangular box */
+  transition: all 0.25s ease-in-out;
+  cursor: pointer;
+}
+
+.btn-peek:hover {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+}
+
+.btn-peek-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #ffffff !important;
+  font-family: var(--font-mono), sans-serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0px !important;
+  transition: all 0.25s ease-in-out;
+  cursor: pointer;
+}
+
+.btn-peek-sm:hover {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+}
+
+/* --- Flying Ad Flyer Spring Animation --- */
+@keyframes flyInCenter {
+  0% {
+    opacity: 0;
+    transform: translateY(-120vh) scale(0.2) rotate(-25deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(20px) scale(1.04) rotate(3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0deg);
+  }
+}
+
+.animate-fly-in {
+  animation: flyInCenter 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+

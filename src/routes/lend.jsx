@@ -66,16 +66,16 @@ export function LendPage({ onBack }) {
               <button
                 type="button"
                 onClick={onBack}
-                className="bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white px-4 py-2 rounded-full border border-neutral-700 text-xs font-mono transition-colors cursor-pointer flex items-center gap-2 shrink-0"
+                className="btn-peek-sm"
               >
-                ← Back to Mohalla Store
+                ← BACK TO MOHALLA STORE
               </button>
             ) : (
               <Link
                 to="/peek"
-                className="bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white px-4 py-2 rounded-full border border-neutral-700 text-xs font-mono transition-colors cursor-pointer flex items-center gap-2 shrink-0"
+                className="btn-peek-sm"
               >
-                ← Back to Mohalla Store
+                ← BACK TO MOHALLA STORE
               </Link>
             )}
             <div>
@@ -94,9 +94,9 @@ export function LendPage({ onBack }) {
           <div className="flex items-center gap-3">
             <Link
               to="/radar"
-              className="bg-[#09414b]/40 hover:bg-[#0c5360] text-teal-200 px-4 py-2 rounded-full border border-[#0c5360] text-xs font-mono transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+              className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer text-xs font-medium tracking-wide text-neutral-300"
             >
-              📡 Mohalla Radar
+              Mohalla Radar
             </Link>
             <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-neutral-400 bg-neutral-900/90 border border-neutral-800 px-4 py-2 rounded-full w-fit">
               <span>🛡️ 100% Verified Neighborhood Lends</span>
@@ -331,9 +331,9 @@ export function LendPage({ onBack }) {
               {/* Submit CTA Button */}
               <button
                 type="submit"
-                className="mt-2 bg-gradient-to-r from-[#0a3038] via-[#09414b] to-[#042028] hover:from-[#0c5360] hover:to-[#09414b] text-teal-100 font-extrabold text-sm sm:text-base py-4 rounded-2xl transition-all border border-[#0c5360] shadow-md hover:scale-[1.01] cursor-pointer flex items-center justify-center gap-2"
+                className="btn-peek w-full mt-2"
               >
-                <span>🚀 List Item on Mohalla Store</span>
+                <span>LIST ITEM ON MOHALLA STORE</span>
               </button>
             </div>
           </form>

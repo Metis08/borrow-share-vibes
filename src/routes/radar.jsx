@@ -292,23 +292,23 @@ export function MohallaRadarPage() {
 
         {/* Center Navbar Links */}
         <nav className="hidden md:flex items-center gap-8 text-xs font-medium tracking-wide text-neutral-300">
-          <Link to="/peek" className="hover:text-white transition-colors">
+          <Link to="/peek" className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer">
             Explore your Mohalla
           </Link>
-          <Link to="/peek" className="hover:text-white transition-colors">
+          <Link to="/peek" className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer">
             Mohalla Stories
           </Link>
-          <Link to="/peek" className="hover:text-white transition-colors">
+          <Link to="/peek" className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer">
             Messages
           </Link>
-          <Link to="/peek" className="hover:text-white transition-colors">
+          <Link to="/peek" className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer">
             Profile
           </Link>
           <Link
             to="/radar"
-            className="text-teal-100 font-semibold bg-[#083842]/70 px-3.5 py-1.5 rounded-full border border-neutral-800 transition-colors flex items-center gap-1.5 shadow-sm"
+            className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer font-semibold text-[#facc15] underline underline-offset-4 decoration-[#facc15]"
           >
-            <span>📡 Mohalla Radar</span>
+            Mohalla Radar
           </Link>
         </nav>
 
@@ -316,10 +316,9 @@ export function MohallaRadarPage() {
         <div className="flex items-center gap-4">
           <Link
             to="/lend"
-            className="bg-gradient-to-r from-[#09414b] via-[#083842] to-[#042028] hover:from-[#0c5360] hover:to-[#09414b] text-white font-semibold text-xs px-4 py-2 rounded-full flex items-center gap-1.5 border border-neutral-800 shadow-md transition-all cursor-pointer"
+            className="btn-peek-sm"
           >
-            <span className="text-sm font-bold leading-none">+</span>
-            <span>Lend Something</span>
+            + LEND SOMETHING
           </Link>
         </div>
       </header>

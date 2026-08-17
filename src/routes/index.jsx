@@ -422,11 +422,9 @@ function Index() {
                   <div className="flex justify-center items-center pointer-events-auto mb-6">
                     <Link
                       to="/peek"
-                      className="group relative px-10 py-3.5 rounded-none bg-white/[0.03] border border-white/30 hover:border-yellow-400 hover:bg-yellow-400 hover:text-black transition-all duration-300 shadow-xl cursor-pointer w-48 text-center text-white block"
+                      className="btn-peek px-12 py-4"
                     >
-                      <span className="font-mono text-[11px] uppercase tracking-[0.22em] font-medium block">
-                        Take a Peek
-                      </span>
+                      TAKE A PEEK
                     </Link>
                   </div>
                 </div>
