@@ -457,6 +457,11 @@
   filter: sepia(100%) hue-rotate(130deg) saturate(600%) brightness(1.1) contrast(120%) !important;
 }
 
+/* Dark Bluish Teal Map Tile Styling */
+.mohalla-dark-teal-glass-map-tiles {
+  filter: sepia(100%) hue-rotate(150deg) saturate(300%) brightness(68%) contrast(125%) !important;
+}
+
 /* Glassmorphic editorial zoom control elements override */
 .leaflet-bar {
   border: 1px solid rgba(255, 255, 255, 0.12) !important;

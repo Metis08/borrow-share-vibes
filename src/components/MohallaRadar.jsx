@@ -4,166 +4,244 @@ import { formatKm } from "@/lib/lenders";
 
 const CATEGORIES = ["All", "Electronics", "Tools", "Books", "Home", "Outdoor", "Events", "Other"];
 
+// Generate procedural 3D building blocks around neighborhood
+const generate3dBuildings = (centerLat, centerLng) => {
+  const buildings = [];
+  const count = 52;
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + (i % 7) * 0.12;
+    const dist = 0.002 + ((i * 31) % 120) * 0.00016;
+    const lat = centerLat + Math.sin(angle) * dist;
+    const lng = centerLng + Math.cos(angle) * dist * 1.35;
+    const width = 26 + (i % 5) * 8;
+    const height = 20 + (i % 4) * 6;
+    const stories = 5 + ((i * 19) % 18); // 5 to 23 stories
+
+    buildings.push({
+      lat,
+      lng,
+      width,
+      height,
+      stories,
+      colorFront: i % 3 === 0 ? "#0d3142" : "#08222f",
+      colorSide: i % 3 === 0 ? "#14455d" : "#0e3447",
+      colorRoof: i % 3 === 0 ? "#1c6082" : "#134966"
+    });
+  }
+  return buildings;
+};
+
+// Canvas 3D Building Extrusion Layer for Leaflet
+const create3dBuildingCanvasLayer = (L, centerLat, centerLng) => {
+  const CanvasLayer = L.Layer.extend({
+    onAdd: function (map) {
+      this._map = map;
+      this._canvas = L.DomUtil.create("canvas", "leaflet-3d-buildings-canvas");
+      this._canvas.style.position = "absolute";
+      this._canvas.style.top = "0";
+      this._canvas.style.left = "0";
+      this._canvas.style.pointerEvents = "none";
+      this._canvas.style.zIndex = "4";
+      map.getPanes().overlayPane.appendChild(this._canvas);
+
+      map.on("move zoom reset", this._update, this);
+      this._update();
+    },
+
+    onRemove: function (map) {
+      L.DomUtil.remove(this._canvas);
+      this._map.off("move zoom reset", this._update, this);
+    },
+
+    _update: function () {
+      const map = this._map;
+      if (!map) return;
+      const size = map.getSize();
+      this._canvas.width = size.x;
+      this._canvas.height = size.y;
+
+      const topLeft = map.containerPointToLayerPoint([0, 0]);
+      L.DomUtil.setPosition(this._canvas, topLeft);
+
+      const ctx = this._canvas.getContext("2d");
+      ctx.clearRect(0, 0, size.x, size.y);
+
+      const buildings = generate3dBuildings(centerLat, centerLng);
+      // Sort buildings by latitude for correct 3D overlap depth
+      buildings.sort((a, b) => b.lat - a.lat);
+
+      buildings.forEach((b) => {
+        const basePoint = map.latLngToContainerPoint([b.lat, b.lng]);
+        const w = b.width;
+        const h = b.height;
+        const depth = b.stories * 2.4; // Extrusion height
+
+        const x0 = basePoint.x - w / 2;
+        const y0 = basePoint.y - h / 2;
+        const x1 = basePoint.x + w / 2;
+        const y1 = basePoint.y + h / 2;
+
+        const rx0 = x0;
+        const ry0 = y0 - depth;
+        const rx1 = x1;
+        const ry1 = y1 - depth;
+
+        // Front Wall
+        ctx.fillStyle = b.colorFront;
+        ctx.beginPath();
+        ctx.moveTo(x0, y1);
+        ctx.lineTo(x1, y1);
+        ctx.lineTo(rx1, ry1);
+        ctx.lineTo(rx0, ry1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(251, 191, 36, 0.15)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Right Side Wall
+        ctx.fillStyle = b.colorSide;
+        ctx.beginPath();
+        ctx.moveTo(x1, y0);
+        ctx.lineTo(x1, y1);
+        ctx.lineTo(rx1, ry1);
+        ctx.lineTo(rx1, ry0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(251, 191, 36, 0.15)";
+        ctx.stroke();
+
+        // Roof Top
+        ctx.fillStyle = b.colorRoof;
+        ctx.beginPath();
+        ctx.moveTo(rx0, ry0);
+        ctx.lineTo(rx1, ry0);
+        ctx.lineTo(rx1, ry1);
+        ctx.lineTo(rx0, ry1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "rgba(251, 191, 36, 0.35)";
+        ctx.stroke();
+
+        // Glowing Windows Grid on facades
+        if (b.stories > 5) {
+          ctx.fillStyle = "rgba(251, 191, 36, 0.75)";
+          for (let floor = 1; floor < b.stories - 1; floor += 3) {
+            const wy = y1 - floor * 2.2;
+            ctx.fillRect(x0 + 4, wy, 3, 2);
+            ctx.fillRect(x0 + 12, wy, 3, 2);
+            if (w > 26) ctx.fillRect(x0 + 20, wy, 3, 2);
+          }
+        }
+      });
+    }
+  });
+
+  return new CanvasLayer();
+};
+
 const getMockupItems = (lat, lng) => [
   { 
-    id: "fallback-tripod", 
-    itemName: "Tripod", 
+    id: "fallback-cam", 
+    itemName: "Sony Alpha DSLR", 
     category: "Electronics", 
-    description: "Professional aluminum travel tripod", 
-    distanceKm: 0.40, 
-    owner: "Lender 7", 
-    shelfName: "Ritu's Shelf",
-    phone: "9876543216",
-    latitude: lat - 0.007, 
-    longitude: lng - 0.018, 
-    locationName: "Nehru Enclave",
+    description: "Full-frame 4K Mirrorless Camera", 
+    distanceKm: 0.35, 
+    owner: "Priyanka S.", 
+    shelfName: "Priyanka's Shelf",
+    phone: "9876543212",
+    latitude: lat + 0.0018, 
+    longitude: lng - 0.0025, 
+    locationName: "Govindpuri Block B",
     hasPin: true
   },
   { 
     id: "fallback-proj", 
-    itemName: "Projector", 
+    itemName: "Full HD Projector", 
     category: "Electronics", 
-    description: "Full HD Home Theater Projector", 
-    distanceKm: 0.65, 
-    owner: "Lender 1", 
+    description: "4K Home Theater Projector with screen", 
+    distanceKm: 0.50, 
+    owner: "Mahek A.", 
     shelfName: "Mahek's Shelf",
     phone: "9876543210",
-    latitude: lat - 0.005, 
-    longitude: lng - 0.015, 
-    locationName: "East of Kailash",
+    latitude: lat - 0.0015, 
+    longitude: lng + 0.0028, 
+    locationName: "Kalkaji D-Block",
+    hasPin: true
+  },
+  { 
+    id: "fallback-tripod", 
+    itemName: "Carbon Tripod", 
+    category: "Electronics", 
+    description: "Professional lightweight camera tripod", 
+    distanceKm: 0.65, 
+    owner: "Ritu M.", 
+    shelfName: "Ritu's Shelf",
+    phone: "9876543216",
+    latitude: lat + 0.0032, 
+    longitude: lng + 0.0019, 
+    locationName: "Nehru Enclave",
     hasPin: true
   },
   { 
     id: "fallback-lad", 
-    itemName: "Ladder", 
+    itemName: "Telescopic Ladder", 
     category: "Tools", 
-    description: "6-foot folding aluminum ladder", 
-    distanceKm: 0.90, 
-    owner: "Lender 2", 
+    description: "12-foot heavy duty aluminum ladder", 
+    distanceKm: 0.85, 
+    owner: "Rohan K.", 
     shelfName: "Rohan's Shelf",
     phone: "9876543211",
-    latitude: lat - 0.014, 
-    longitude: lng - 0.024, 
-    locationName: "Saket",
-    hasPin: true
-  },
-  { 
-    id: "fallback-cam", 
-    itemName: "Camera", 
-    category: "Electronics", 
-    description: "Nikon D3500 DSLR with kit lens", 
-    distanceKm: 1.20, 
-    owner: "Lender 3", 
-    shelfName: "Priyanka's Shelf",
-    phone: "9876543212",
-    latitude: lat + 0.008, 
-    longitude: lng + 0.010, 
-    locationName: "Govindpuri",
-    hasPin: true
-  },
-  { 
-    id: "fallback-cont", 
-    itemName: "Controller", 
-    category: "Electronics", 
-    description: "Xbox Wireless Controller", 
-    distanceKm: 1.40, 
-    owner: "Lender 4", 
-    shelfName: "Ankit's Shelf",
-    phone: "9876543213",
-    latitude: lat + 0.015, 
-    longitude: lng + 0.020, 
-    locationName: "Okhla",
+    latitude: lat - 0.0028, 
+    longitude: lng - 0.0035, 
+    locationName: "Alaknanda",
     hasPin: true
   },
   { 
     id: "fallback-tent", 
-    itemName: "Tent", 
+    itemName: "Quechua 3P Tent", 
     category: "Outdoor", 
-    description: "3-person camping tent", 
-    distanceKm: 1.60, 
-    owner: "Lender 5", 
-    shelfName: "Sanya's Shelf",
+    description: "Waterproof 3-person waterproof tent", 
+    distanceKm: 1.10, 
+    owner: "Vikram P.", 
+    shelfName: "Vikram's Shelf",
     phone: "9876543214",
-    latitude: lat - 0.010, 
-    longitude: lng + 0.025, 
-    locationName: "Malviya Nagar",
+    latitude: lat + 0.0042, 
+    longitude: lng - 0.0048, 
+    locationName: "Chittaranjan Park",
     hasPin: true
   },
   { 
-    id: "fallback-books", 
-    itemName: "Books", 
-    category: "Books", 
-    description: "Set of classic fiction novels", 
-    distanceKm: 1.80, 
-    owner: "Lender 6", 
-    shelfName: "Kabir's Shelf",
+    id: "fallback-speaker", 
+    itemName: "JBL PartyBox", 
+    category: "Events", 
+    description: "High bass bluetooth party speaker", 
+    distanceKm: 1.25, 
+    owner: "Aman T.", 
+    shelfName: "Aman's Shelf",
     phone: "9876543215",
-    latitude: lat + 0.014, 
-    longitude: lng - 0.028, 
-    locationName: "Nehru Place",
-    hasPin: true
-  },
-  { 
-    id: "fallback-drill", 
-    itemName: "Drill", 
-    category: "Tools", 
-    description: "Cordless power drill with bit set", 
-    distanceKm: 2.10, 
-    owner: "Lender 8", 
-    shelfName: "Dev's Shelf",
-    phone: "9876543217",
-    latitude: lat + 0.017, 
-    longitude: lng + 0.024, 
-    locationName: "Kalkaji Extension",
+    latitude: lat - 0.0038, 
+    longitude: lng + 0.0045, 
+    locationName: "GK-II",
     hasPin: true
   },
   { 
     id: "fallback-gk", 
-    itemName: "Greater Kailash Local Annotation",
+    itemName: "Greater Kailash",
     category: "Other", 
     latitude: lat - 0.003, 
-    longitude: lng - 0.012, 
+    longitude: lng - 0.005, 
     locationName: "Greater Kailash", 
     isDecorationOnly: true,
     hasPin: false
   },
   { 
     id: "fallback-kalkaji", 
-    itemName: "Kalkaji Local Annotation",
+    itemName: "Kalkaji",
     category: "Other", 
-    latitude: lat + 0.007, 
-    longitude: lng - 0.002, 
+    latitude: lat + 0.003, 
+    longitude: lng - 0.001, 
     locationName: "Kalkaji", 
-    isDecorationOnly: true,
-    hasPin: false
-  },
-  { 
-    id: "fallback-jasola", 
-    itemName: "Jasola Local Annotation",
-    category: "Other", 
-    latitude: lat - 0.012, 
-    longitude: lng + 0.004, 
-    locationName: "Jasola", 
-    isDecorationOnly: true,
-    hasPin: false
-  },
-  { 
-    id: "fallback-kb", 
-    itemName: "Karauli Bagh Local Annotation",
-    category: "Other", 
-    latitude: lat + 0.002, 
-    longitude: lng - 0.026, 
-    locationName: "Karauli Bagh", 
-    isDecorationOnly: true,
-    hasPin: false
-  },
-  { 
-    id: "fallback-yamuna", 
-    itemName: "Yamuna Local Annotation",
-    category: "Other", 
-    latitude: lat + 0.011, 
-    longitude: lng + 0.027, 
-    locationName: "Yamuna", 
     isDecorationOnly: true,
     hasPin: false
   }
@@ -213,6 +291,19 @@ export default function MohallaRadar({
   const mapInstanceRef = useRef(null);
   const markersGroupRef = useRef(null);
 
+  const handleRecenterMap = () => {
+    if (mapInstanceRef.current && centerLat && centerLng) {
+      mapInstanceRef.current.setView([centerLat, centerLng], 15, { animate: true });
+    }
+  };
+
+  const handleZoomMap = (delta) => {
+    if (mapInstanceRef.current) {
+      const zoom = mapInstanceRef.current.getZoom();
+      mapInstanceRef.current.setZoom(zoom + delta);
+    }
+  };
+
   // Synchronise initial locations when values are fetched
   useEffect(() => {
     setLocationSharingEnabled(initialLocationSharing);
@@ -245,10 +336,10 @@ export default function MohallaRadar({
 
   // Synchronise selected item from discovery list
   useEffect(() => {
-    if (selectedItemFromParent) {
+    if (selectedItemFromParent && selectedItemFromParent.latitude && selectedItemFromParent.longitude) {
       setSelectedRadarItem(selectedItemFromParent);
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.setView([selectedItemFromParent.latitude, selectedItemFromParent.longitude], 15);
+        mapInstanceRef.current.flyTo({ center: [selectedItemFromParent.longitude, selectedItemFromParent.latitude], zoom: 16.5, pitch: 60 });
       }
     }
   }, [selectedItemFromParent]);
@@ -271,7 +362,6 @@ export default function MohallaRadar({
         const data = await res.json();
         const apiItems = data || [];
         const mocks = getMockupItems(centerLat, centerLng);
-        // Merge DB items with mocked items dynamically by name
         const merged = [...apiItems, ...mocks.filter(m => !apiItems.some(i => i.itemName.toLowerCase() === m.itemName.toLowerCase()))];
         setItems(merged);
       } else {
@@ -290,7 +380,7 @@ export default function MohallaRadar({
     fetchRadarItems();
   }, [centerLat, centerLng, radiusKm, category, sortOrder]);
 
-  // Trigger search on debounce or manual press
+  // Trigger search on debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchRadarItems();
@@ -318,7 +408,6 @@ export default function MohallaRadar({
         setLocationSharingEnabled(enabled);
         setCenterLat(lat);
         setCenterLng(lng);
-        // Refresh items explicitly
         fetchRadarItems();
       }
     } catch (err) {
@@ -355,19 +444,6 @@ export default function MohallaRadar({
       updateSharingSettings(false, 0, 0);
     } else {
       setLocationSharingEnabled(false);
-    }
-  };
-
-  const handleRecenterMap = () => {
-    if (mapInstanceRef.current && centerLat && centerLng) {
-      mapInstanceRef.current.setView([centerLat, centerLng], 14, { animate: true });
-    }
-  };
-
-  const handleZoomMap = (delta) => {
-    if (mapInstanceRef.current) {
-      const zoom = mapInstanceRef.current.getZoom();
-      mapInstanceRef.current.setZoom(zoom + delta);
     }
   };
 
@@ -418,11 +494,10 @@ export default function MohallaRadar({
     }
   };
 
-  // Leaflet Map Initialization and Operations
+  // Leaflet 3D Building Dark Map Initialization
   useEffect(() => {
     if (!L || !mapContainerRef.current) return;
 
-    // Destroy existing instance if container re-rendered
     if (mapInstanceRef.current) {
       mapInstanceRef.current.remove();
       mapInstanceRef.current = null;
@@ -430,25 +505,23 @@ export default function MohallaRadar({
 
     const map = L.map(mapContainerRef.current, {
       center: [centerLat, centerLng],
-      zoom: 14,
+      zoom: 15,
       zoomControl: false,
-      attributionControl: true
+      attributionControl: false
     });
     mapInstanceRef.current = map;
 
-    // Base Layer: Black map background with greyish roads
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
+    // CartoDB Dark Matter Base Tiles (With custom Dark Teal Glassmorphic CSS filter)
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       maxZoom: 19,
-      className: "grey-map-base",
-      attribution: '&copy; <a href="https://carto.com/">CartoDB</a> contributors'
+      subdomains: "abcd",
+      className: "mohalla-dark-teal-glass-map-tiles",
+      attribution: '&copy; CartoDB &copy; OpenStreetMap'
     }).addTo(map);
 
-    // Labels Layer: City/neighbourhood names placed on top and filtered to teal
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-      className: "teal-map-labels",
-      attribution: ''
-    }).addTo(map);
+    // 3D Extruded Building Layer
+    const buildingCanvas = create3dBuildingCanvasLayer(L, centerLat, centerLng);
+    buildingCanvas.addTo(map);
 
     const group = L.layerGroup().addTo(map);
     markersGroupRef.current = group;
@@ -459,16 +532,16 @@ export default function MohallaRadar({
         mapInstanceRef.current = null;
       }
     };
-  }, [L]);
+  }, [L, centerLat, centerLng]);
 
-  // Update map coordinates if map is running
+  // Update map center when coordinates change
   useEffect(() => {
     if (L && mapInstanceRef.current) {
-      mapInstanceRef.current.setView([centerLat, centerLng], 14);
+      mapInstanceRef.current.setView([centerLat, centerLng], 15);
     }
   }, [L, centerLat, centerLng]);
 
-  // Redraw custom item pins & user indicator on map
+  // Redraw custom 3D floating item markers & user location indicator
   useEffect(() => {
     if (!L) return;
     const map = mapInstanceRef.current;
@@ -477,51 +550,61 @@ export default function MohallaRadar({
 
     group.clearLayers();
 
-    // 1. Draw User coordinate marker if enabled
+    // 1. User Location Indicator (3D Glowing Gold Ping)
     if (locationSharingEnabled && centerLat && centerLng) {
       const userIcon = L.divIcon({
         html: `
-          <div class="relative flex items-center justify-center w-32 h-32 pointer-events-none select-none">
-            <div class="absolute w-28 h-28 rounded-full border border-cyan-400/10"></div>
-            <div class="absolute w-20 h-20 rounded-full border border-dashed border-cyan-400/20"></div>
-            <div class="absolute w-12 h-12 rounded-full border border-cyan-400/30"></div>
-            <div class="absolute w-12 h-12 rounded-full border border-cyan-400/40 animate-ping opacity-25"></div>
-            <div class="absolute w-3.5 h-3.5 bg-[#0dedff] rounded-full border border-white shadow-[0_0_12px_rgba(13,237,255,0.95)] z-10"></div>
+          <div class="relative flex items-center justify-center w-16 h-16 pointer-events-none select-none">
+            <div class="absolute w-14 h-14 rounded-full border-2 border-amber-400/50 animate-ping"></div>
+            <div class="absolute w-10 h-10 rounded-full border border-dashed border-amber-300/60"></div>
+            <div class="absolute w-4 h-4 bg-amber-400 rounded-full border-2 border-white shadow-[0_0_20px_rgba(251,191,36,0.95)] z-10"></div>
           </div>
         `,
         className: "custom-user-indicator-marker",
-        iconSize: [128, 128],
-        iconAnchor: [64, 64]
+        iconSize: [64, 64],
+        iconAnchor: [32, 32]
       });
       L.marker([centerLat, centerLng], { icon: userIcon }).addTo(group);
     }
 
-    // 2. Draw lendable items markers
+    // 2. Lendable Items Markers (Sleek Dark 3D Floating Pill Badges with Ground Pins)
     items.forEach((item) => {
       const locName = item.locationName || item.shelfName || "mohalla";
-      const showPin = item.hasPin !== false;
-      
+      const isDecor = item.isDecorationOnly;
+      const emoji = getItemEmoji(item.category);
+
+      if (isDecor) {
+        const decorIcon = L.divIcon({
+          html: `
+            <div class="font-hand text-[22px] text-amber-300 font-bold whitespace-nowrap tracking-wide select-none filter drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+              ${locName}
+            </div>
+          `,
+          className: `radar-decor-${item.id}`,
+          iconSize: [150, 40],
+          iconAnchor: [75, 20]
+        });
+        L.marker([item.latitude, item.longitude], { icon: decorIcon }).addTo(group);
+        return;
+      }
+
       const itemIcon = L.divIcon({
         html: `
-          <div class="relative flex flex-col items-center justify-start w-[200px] h-[60px] select-none pointer-events-none">
-            ${showPin ? `
-              <div class="relative flex flex-col items-center hover:scale-115 transition-transform duration-200 pointer-events-auto cursor-pointer">
-                {/* Glow ring */}
-                <div class="absolute -top-1 w-6 h-6 rounded-full bg-yellow-500/20 blur-sm"></div>
-                {/* Tear-drop golden pin SVG */}
-                <svg class="w-6 h-6 text-[#cfbda3] fill-current drop-shadow-[0_2px_4px_rgba(0,0,0,0.65)]" viewBox="0 0 24 24">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                </svg>
-              </div>
-            ` : ""}
-            <span class="absolute ${showPin ? "top-[25px]" : "top-[4px]"} font-hand text-[22px] sm:text-[25px] text-[#559eb4] whitespace-nowrap tracking-wide select-none leading-none pt-0.5 filter drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
-              ${locName}
-            </span>
+          <div class="group relative flex flex-col items-center justify-center cursor-pointer select-none">
+            <!-- Dark 3D Floating Pill Badge -->
+            <div class="flex items-center gap-2 bg-[#081522]/95 hover:bg-[#0e2238] text-white border border-amber-400/85 shadow-[0_12px_36px_rgba(0,0,0,0.95)] px-3.5 py-1.5 rounded-full backdrop-blur-md transform group-hover:scale-115 transition-all duration-300">
+              <span class="text-base leading-none filter drop-shadow">${emoji}</span>
+              <span class="font-display text-xs font-semibold tracking-wide text-white whitespace-nowrap">${item.itemName}</span>
+              <span class="font-mono text-[10px] text-amber-300 font-bold whitespace-nowrap">· ${formatKm(item.distanceKm)}</span>
+            </div>
+            <!-- 3D Ground Stem Line -->
+            <div class="w-0.5 h-3.5 bg-gradient-to-b from-amber-400/90 to-amber-400/20"></div>
+            <div class="w-2.5 h-1 bg-amber-400/70 rounded-full blur-[1px]"></div>
           </div>
         `,
-        className: `radar-marker-${item.id}`,
-        iconSize: [200, 60],
-        iconAnchor: [100, 10]
+        className: `radar-item-marker-${item.id}`,
+        iconSize: [180, 60],
+        iconAnchor: [90, 60]
       });
 
       const marker = L.marker([item.latitude, item.longitude], { icon: itemIcon }).addTo(group);
@@ -529,35 +612,38 @@ export default function MohallaRadar({
         setSelectedRadarItem(item);
       });
     });
-  }, [L, items, locationSharingEnabled, centerLat, centerLng, currentUser]);
+  }, [L, items, locationSharingEnabled, centerLat, centerLng]);
 
   return (
-    <div className={embedMode ? "relative w-full h-full z-10 bg-slate-950 flex flex-col overflow-hidden animate-fade-in" : "fixed inset-0 w-screen h-screen z-50 bg-slate-950 flex flex-col overflow-hidden decode-overlay"}>
+    <div className={embedMode ? "fixed inset-0 w-screen h-screen z-0 bg-[#051722] flex flex-col overflow-hidden animate-fade-in" : "fixed inset-0 w-screen h-screen z-50 bg-[#051722] flex flex-col overflow-hidden decode-overlay"}>
       
-      {/* Edge-to-Edge Map DOM */}
+      {/* Edge-to-Edge Full Screen 3D Map DOM */}
       <div 
         ref={mapContainerRef} 
-        className="absolute inset-0 w-full h-full z-10"
+        className="absolute inset-0 w-full h-full z-0"
       />
 
-      {/* Custom Sleek Glassmorphic Map Controls Stack */}
-      <div className="absolute bottom-[160px] right-4 sm:right-6 md:right-8 z-25 flex flex-col gap-2 pointer-events-auto">
-        {/* Recenter button */}
+      {/* Dark Blue Glassmorphic Atmosphere Overlay Layer */}
+      <div className="absolute inset-0 z-5 pointer-events-none bg-gradient-to-br from-[#06293a]/45 via-[#09364c]/25 to-[#041926]/55 backdrop-blur-[1.5px] shadow-[inset_0_0_150px_rgba(14,116,144,0.38)] border border-teal-500/10" />
+
+      {/* Floating Glassmorphic Map Controls Stack */}
+      <div className="absolute bottom-6 right-6 z-30 flex flex-col gap-2 pointer-events-auto">
+        {/* Recenter Button */}
         <button
           type="button"
           onClick={handleRecenterMap}
-          className="w-10 h-10 rounded-lg border border-teal-500/20 bg-slate-900/80 backdrop-blur-md flex items-center justify-center text-teal-400 hover:text-yellow-400 hover:border-yellow-400/40 transition-colors shadow-lg cursor-pointer font-bold focus:outline-none"
+          className="w-10 h-10 rounded-full border border-white/20 bg-slate-900/90 backdrop-blur-md flex items-center justify-center text-amber-400 hover:text-white hover:border-amber-400 transition-colors shadow-2xl cursor-pointer font-bold focus:outline-none"
           title="Recenter on User"
         >
           <span className="text-xl font-light leading-none">◎</span>
         </button>
 
         {/* Zoom Controls */}
-        <div className="flex flex-col rounded-lg border border-teal-500/20 bg-slate-900/80 backdrop-blur-md overflow-hidden shadow-lg">
+        <div className="flex flex-col rounded-full border border-white/20 bg-slate-900/90 backdrop-blur-md overflow-hidden shadow-2xl">
           <button
             type="button"
             onClick={() => handleZoomMap(1)}
-            className="w-10 h-10 flex items-center justify-center text-teal-400 hover:text-yellow-400 transition-colors border-b border-teal-500/10 cursor-pointer font-light text-2xl focus:outline-none"
+            className="w-10 h-10 flex items-center justify-center text-amber-400 hover:text-white transition-colors border-b border-white/10 cursor-pointer font-light text-2xl focus:outline-none"
             title="Zoom In"
           >
             +
@@ -565,7 +651,7 @@ export default function MohallaRadar({
           <button
             type="button"
             onClick={() => handleZoomMap(-1)}
-            className="w-10 h-10 flex items-center justify-center text-teal-400 hover:text-yellow-400 transition-colors cursor-pointer font-light text-2xl focus:outline-none"
+            className="w-10 h-10 flex items-center justify-center text-amber-400 hover:text-white transition-colors cursor-pointer font-light text-2xl focus:outline-none"
             title="Zoom Out"
           >
             −

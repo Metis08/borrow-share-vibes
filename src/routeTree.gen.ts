@@ -10,11 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LendRouteImport } from './routes/lend'
 import { Route as PeekRouteImport } from './routes/peek'
+import { Route as RadarRouteImport } from './routes/radar'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LendRoute = LendRouteImport.update({
+  id: '/lend',
+  path: '/lend',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PeekRoute = PeekRouteImport.update({
@@ -22,31 +29,44 @@ const PeekRoute = PeekRouteImport.update({
   path: '/peek',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RadarRoute = RadarRouteImport.update({
+  id: '/radar',
+  path: '/radar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/lend': typeof LendRoute
   '/peek': typeof PeekRoute
+  '/radar': typeof RadarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/lend': typeof LendRoute
   '/peek': typeof PeekRoute
+  '/radar': typeof RadarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/lend': typeof LendRoute
   '/peek': typeof PeekRoute
+  '/radar': typeof RadarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/peek'
+  fullPaths: '/' | '/lend' | '/peek' | '/radar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/peek'
-  id: '__root__' | '/' | '/peek'
+  to: '/' | '/lend' | '/peek' | '/radar'
+  id: '__root__' | '/' | '/lend' | '/peek' | '/radar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LendRoute: typeof LendRoute
   PeekRoute: typeof PeekRoute
+  RadarRoute: typeof RadarRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,6 +78,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lend': {
+      id: '/lend'
+      path: '/lend'
+      fullPath: '/lend'
+      preLoaderRoute: typeof LendRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/peek': {
       id: '/peek'
       path: '/peek'
@@ -65,12 +92,21 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PeekRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/radar': {
+      id: '/radar'
+      path: '/radar'
+      fullPath: '/radar'
+      preLoaderRoute: typeof RadarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LendRoute: LendRoute,
   PeekRoute: PeekRoute,
+  RadarRoute: RadarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
