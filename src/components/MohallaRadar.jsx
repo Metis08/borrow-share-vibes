@@ -95,7 +95,7 @@ const create3dBuildingCanvasLayer = (L, centerLat, centerLng) => {
         ctx.lineTo(rx0, ry1);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = "rgba(251, 191, 36, 0.15)";
+        ctx.strokeStyle = "rgba(209, 213, 219, 0.35)";
         ctx.lineWidth = 1;
         ctx.stroke();
 
@@ -108,7 +108,7 @@ const create3dBuildingCanvasLayer = (L, centerLat, centerLng) => {
         ctx.lineTo(rx1, ry0);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = "rgba(251, 191, 36, 0.15)";
+        ctx.strokeStyle = "rgba(209, 213, 219, 0.35)";
         ctx.stroke();
 
         // Roof Top
@@ -120,7 +120,7 @@ const create3dBuildingCanvasLayer = (L, centerLat, centerLng) => {
         ctx.lineTo(rx0, ry1);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = "rgba(251, 191, 36, 0.35)";
+        ctx.strokeStyle = "rgba(229, 231, 235, 0.55)";
         ctx.stroke();
 
         // Glowing Windows Grid on facades
@@ -140,6 +140,37 @@ const create3dBuildingCanvasLayer = (L, centerLat, centerLng) => {
   return new CanvasLayer();
 };
 
+const getItemImage = (item) => {
+  if (item?.image) return item.image;
+  if (item?.photo) return item.photo;
+  const name = ((item?.itemName || item?.title || "") + " " + (item?.category || "")).toLowerCase();
+  if (name.includes("cam") || name.includes("photo") || name.includes("lens")) {
+    return "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=600";
+  }
+  if (name.includes("proj")) {
+    return "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=600";
+  }
+  if (name.includes("tripod") || name.includes("stand")) {
+    return "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&q=80&w=600";
+  }
+  if (name.includes("ladder") || name.includes("drill") || name.includes("tool") || name.includes("hammer")) {
+    return "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&q=80&w=600";
+  }
+  if (name.includes("tent") || name.includes("camp") || name.includes("outdoor")) {
+    return "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&q=80&w=600";
+  }
+  if (name.includes("speaker") || name.includes("audio") || name.includes("sound") || name.includes("party")) {
+    return "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&q=80&w=600";
+  }
+  if (name.includes("book") || name.includes("read") || name.includes("novel")) {
+    return "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=600";
+  }
+  if (name.includes("game") || name.includes("jenga") || name.includes("board")) {
+    return "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?auto=format&fit=crop&q=80&w=600";
+  }
+  return "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&q=80&w=600";
+};
+
 const getMockupItems = (lat, lng) => [
   { 
     id: "fallback-cam", 
@@ -153,6 +184,7 @@ const getMockupItems = (lat, lng) => [
     latitude: lat + 0.0018, 
     longitude: lng - 0.0025, 
     locationName: "Govindpuri Block B",
+    image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=600",
     hasPin: true
   },
   { 
@@ -167,6 +199,7 @@ const getMockupItems = (lat, lng) => [
     latitude: lat - 0.0015, 
     longitude: lng + 0.0028, 
     locationName: "Kalkaji D-Block",
+    image: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=600",
     hasPin: true
   },
   { 
@@ -181,6 +214,7 @@ const getMockupItems = (lat, lng) => [
     latitude: lat + 0.0032, 
     longitude: lng + 0.0019, 
     locationName: "Nehru Enclave",
+    image: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&q=80&w=600",
     hasPin: true
   },
   { 
@@ -195,6 +229,7 @@ const getMockupItems = (lat, lng) => [
     latitude: lat - 0.0028, 
     longitude: lng - 0.0035, 
     locationName: "Alaknanda",
+    image: "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&q=80&w=600",
     hasPin: true
   },
   { 
@@ -209,6 +244,7 @@ const getMockupItems = (lat, lng) => [
     latitude: lat + 0.0042, 
     longitude: lng - 0.0048, 
     locationName: "Chittaranjan Park",
+    image: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&q=80&w=600",
     hasPin: true
   },
   { 
@@ -223,6 +259,7 @@ const getMockupItems = (lat, lng) => [
     latitude: lat - 0.0038, 
     longitude: lng + 0.0045, 
     locationName: "GK-II",
+    image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&q=80&w=600",
     hasPin: true
   },
   { 
@@ -494,7 +531,7 @@ export default function MohallaRadar({
     }
   };
 
-  // Leaflet 3D Building Dark Map Initialization
+  // Leaflet Dark Map Initialization
   useEffect(() => {
     if (!L || !mapContainerRef.current) return;
 
@@ -511,17 +548,25 @@ export default function MohallaRadar({
     });
     mapInstanceRef.current = map;
 
-    // CartoDB Dark Matter Base Tiles (With custom Dark Teal Glassmorphic CSS filter)
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
+    // 1. Dark Base Map with Dark Grey Area Lines (roads, avenues, boundaries)
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
+      maxZoom: 20,
       subdomains: "abcd",
-      className: "mohalla-dark-teal-glass-map-tiles",
-      attribution: '&copy; CartoDB &copy; OpenStreetMap'
+      className: "mohalla-dark-map-base",
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
     }).addTo(map);
 
-    // 3D Extruded Building Layer
+    // 2. 3D Extruded Building Layer
     const buildingCanvas = create3dBuildingCanvasLayer(L, centerLat, centerLng);
     buildingCanvas.addTo(map);
+
+    // 3. Dedicated Map Labels Layer with Dark Grey Area & Locality Names
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", {
+      maxZoom: 20,
+      subdomains: "abcd",
+      className: "mohalla-dark-map-labels",
+      zIndex: 10
+    }).addTo(map);
 
     const group = L.layerGroup().addTo(map);
     markersGroupRef.current = group;
@@ -565,24 +610,35 @@ export default function MohallaRadar({
         iconAnchor: [32, 32]
       });
       L.marker([centerLat, centerLng], { icon: userIcon }).addTo(group);
+
+      // Area concentric range ring in Dark Grey Line
+      L.circle([centerLat, centerLng], {
+        radius: 250,
+        color: "#4b5563",
+        weight: 1.5,
+        dashArray: "4, 6",
+        fillColor: "#1f2937",
+        fillOpacity: 0.08
+      }).addTo(group);
     }
 
-    // 2. Lendable Items Markers (Sleek Dark 3D Floating Pill Badges with Ground Pins)
+    // 2. Lendable Items Markers & Dark Grey Area Names
     items.forEach((item) => {
       const locName = item.locationName || item.shelfName || "mohalla";
       const isDecor = item.isDecorationOnly;
       const emoji = getItemEmoji(item.category);
 
+      // Area name marker in Dark Grey Color
       if (isDecor) {
         const decorIcon = L.divIcon({
           html: `
-            <div class="font-hand text-[22px] text-amber-300 font-bold whitespace-nowrap tracking-wide select-none filter drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+            <div class="font-display text-base font-bold text-neutral-500 uppercase tracking-widest whitespace-nowrap select-none filter drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]">
               ${locName}
             </div>
           `,
           className: `radar-decor-${item.id}`,
-          iconSize: [150, 40],
-          iconAnchor: [75, 20]
+          iconSize: [160, 35],
+          iconAnchor: [80, 17]
         });
         L.marker([item.latitude, item.longitude], { icon: decorIcon }).addTo(group);
         return;
@@ -615,16 +671,16 @@ export default function MohallaRadar({
   }, [L, items, locationSharingEnabled, centerLat, centerLng]);
 
   return (
-    <div className={embedMode ? "fixed inset-0 w-screen h-screen z-0 bg-[#051722] flex flex-col overflow-hidden animate-fade-in" : "fixed inset-0 w-screen h-screen z-50 bg-[#051722] flex flex-col overflow-hidden decode-overlay"}>
+    <div className={embedMode ? "fixed inset-0 w-screen h-screen z-0 bg-[#07080c] flex flex-col overflow-hidden animate-fade-in" : "fixed inset-0 w-screen h-screen z-50 bg-[#07080c] flex flex-col overflow-hidden decode-overlay"}>
       
-      {/* Edge-to-Edge Full Screen 3D Map DOM */}
+      {/* Edge-to-Edge Full Screen Dark Map DOM */}
       <div 
         ref={mapContainerRef} 
         className="absolute inset-0 w-full h-full z-0"
       />
 
-      {/* Dark Blue Glassmorphic Atmosphere Overlay Layer */}
-      <div className="absolute inset-0 z-5 pointer-events-none bg-gradient-to-br from-[#06293a]/45 via-[#09364c]/25 to-[#041926]/55 backdrop-blur-[1.5px] shadow-[inset_0_0_150px_rgba(14,116,144,0.38)] border border-teal-500/10" />
+      {/* Dark Atmosphere Overlay Layer */}
+      <div className="absolute inset-0 z-5 pointer-events-none bg-gradient-to-b from-black/50 via-transparent to-black/70 backdrop-blur-[0.5px] shadow-[inset_0_0_150px_rgba(0,0,0,0.8)] border border-neutral-800/20" />
 
       {/* Floating Glassmorphic Map Controls Stack */}
       <div className="absolute bottom-6 right-6 z-30 flex flex-col gap-2 pointer-events-auto">

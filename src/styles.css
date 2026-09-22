@@ -448,27 +448,32 @@
   border-radius: 55% 45% 65% 35% / 35% 65% 45% 55% !important;
 }
 
-/* Custom dark teal glowing map blueprint overlay style */
+/* Dark UI Map Styling: Rich Dark Background with Dark Grey Area Lines and Dark Grey Area Names */
+.leaflet-container {
+  background-color: #07080c !important;
+}
+
+/* Base lines layer: Streets, avenues, boundaries in dark grey */
+.mohalla-dark-map-base,
+.mohalla-dark-teal-glass-map-tiles,
 .grey-map-base {
-  filter: sepia(100%) hue-rotate(150deg) saturate(160%) brightness(48%) contrast(125%) !important;
+  filter: grayscale(100%) brightness(85%) contrast(115%) !important;
 }
 
+/* Area text labels layer: Locality names, neighborhoods, and area names in dark grey */
+.mohalla-dark-map-labels,
 .teal-map-labels {
-  filter: sepia(100%) hue-rotate(130deg) saturate(600%) brightness(1.1) contrast(120%) !important;
+  filter: grayscale(100%) brightness(65%) contrast(125%) !important;
+  opacity: 0.82 !important;
 }
 
-/* Dark Bluish Teal Map Tile Styling */
-.mohalla-dark-teal-glass-map-tiles {
-  filter: sepia(100%) hue-rotate(150deg) saturate(300%) brightness(68%) contrast(125%) !important;
-}
-
-/* Glassmorphic editorial zoom control elements override */
+/* Glassmorphic editorial zoom control elements */
 .leaflet-bar {
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  background: rgba(13, 26, 42, 0.8) !important;
+  background: rgba(13, 26, 42, 0.85) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6) !important;
   border-radius: 8px !important;
   overflow: hidden !important;
 }
@@ -489,6 +494,18 @@
 }
 .leaflet-bar a:last-child {
   border-bottom: none !important;
+}
+
+.mohalla-dark-popup .leaflet-popup-content-wrapper,
+.mohalla-dark-popup .leaflet-popup-tip {
+  background: #0d0f17 !important;
+  color: #ffffff !important;
+  border: 1px solid #1e293b !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.9) !important;
+  border-radius: 1.25rem !important;
+}
+.mohalla-dark-popup .leaflet-popup-content {
+  margin: 0 !important;
 }
 
 /* Card bottom edges gradually merge into the deep teal page bg using linear gradient and Webkit mask image */
@@ -576,5 +593,37 @@
 .animate-fly-in {
   animation: flyInCenter 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
+
+/* --- Hanging Nimbu-Mirchi Pendulum Sway --- */
+@keyframes nimbuSway {
+  0%, 100% {
+    transform: rotate(-3deg);
+    transform-origin: top center;
+  }
+  50% {
+    transform: rotate(3deg);
+    transform-origin: top center;
+  }
+}
+
+.animate-nimbu-sway {
+  animation: nimbuSway 4s ease-in-out infinite;
+}
+
+/* --- Global Responsive Safety Helpers --- */
+html, body {
+  max-width: 100vw;
+  overflow-x: clip;
+}
+
+/* Hide scrollbar for clean horizontal tab scrolling */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 
 

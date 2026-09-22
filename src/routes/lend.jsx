@@ -1,18 +1,41 @@
 import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import AuthModal from "@/components/AuthModal";
 
 export const Route = createFileRoute("/lend")({
+  head: () => ({
+    meta: [
+      { title: "mohalla store" },
+      {
+        name: "description",
+        content: "Lend an item to your Mohalla community.",
+      },
+    ],
+  }),
   component: LendPage,
 });
 
 export function LendPage({ onBack }) {
   const navigate = useNavigate();
 
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("mohalla_user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Form State
   const [formData, setFormData] = useState({
-    name: "Mahek Aghija",
-    area: "Block E · Terrace Apartment 402",
-    phone: "+91 98765 43210",
+    name: currentUser?.username || "Mahek Aghija",
+    area: currentUser?.area || "Block E · Mohalla Terrace",
+    phone: currentUser?.phone || "+91 98765 43210",
     itemTitle: "",
     description: "",
     duration: "7 Days",
@@ -24,11 +47,24 @@ export function LendPage({ onBack }) {
   const [isDragging, setIsDragging] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  const processFile = (file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("Photo size is too large (max 5MB).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target.result);
+      setErrorMessage("");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setImagePreview(url);
+      processFile(file);
     }
   };
 
@@ -37,25 +73,97 @@ export function LendPage({ onBack }) {
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file);
-      setImagePreview(url);
+      processFile(file);
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      if (onBack) {
-        onBack();
-      } else {
-        navigate({ to: "/peek" });
+    setErrorMessage("");
+
+    if (!formData.itemTitle.trim()) {
+      setErrorMessage("Please enter an item name or title.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+      };
+      if (currentUser?.token) {
+        headers["Authorization"] = `Bearer ${currentUser.token}`;
       }
-    }, 2000);
+
+      const res = await fetch("http://localhost:8085/api/lend", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          itemName: formData.itemTitle.trim(),
+          category: formData.category,
+          description: formData.description.trim(),
+          lenderName: formData.name.trim() || currentUser?.username || "Padosi",
+          area: formData.area.trim() || "Mohalla",
+          phone: formData.phone.trim(),
+          duration: formData.duration,
+          condition: formData.condition,
+          imageUrl: imagePreview || "",
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText || `Server returned error (${res.status})`);
+      }
+
+      // Save user session locally if not set so user is recognized as lender
+      if (!currentUser) {
+        const fallbackSession = {
+          username: formData.name.trim() || "Padosi",
+          area: formData.area.trim(),
+          phone: formData.phone.trim(),
+        };
+        try {
+          localStorage.setItem("mohalla_user", JSON.stringify(fallbackSession));
+          setCurrentUser(fallbackSession);
+        } catch {
+          // ignore
+        }
+      }
+
+      setSubmitted(true);
+      setTimeout(() => {
+        if (onBack) {
+          onBack();
+        } else {
+          navigate({ to: "/peek" });
+        }
+      }, 1600);
+    } catch (err) {
+      console.error("Error submitting lend item:", err);
+      setErrorMessage(
+        err.message?.includes("Failed to fetch")
+          ? "Unable to connect to local Mohalla server (port 8085). Please ensure the backend is running."
+          : `Failed to list item: ${err.message}`
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#07080c] text-white p-4 sm:p-8 md:p-12 relative overflow-hidden flex flex-col items-center justify-center font-sans">
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        initialMode="register"
+        triggerMsg="You need an account & shelf to lend items to your Mohalla."
+        onSuccess={(session) => {
+          setCurrentUser(session);
+          setFormData((prev) => ({ ...prev, name: session.username }));
+        }}
+      />
       {/* Main Glass Container */}
       <div className="w-full max-w-6xl bg-[#0d0f17]/85 backdrop-blur-3xl border border-neutral-800 rounded-[2.5rem] p-6 sm:p-10 shadow-[0_25px_100px_rgba(0,0,0,0.9)] flex flex-col gap-8 relative z-10">
         
@@ -66,16 +174,22 @@ export function LendPage({ onBack }) {
               <button
                 type="button"
                 onClick={onBack}
-                className="btn-peek-sm"
+                title="Back to Mohalla Store"
+                className="w-10 h-10 shrink-0 rounded-full bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-neutral-500 text-neutral-200 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95 group"
               >
-                ← BACK TO MOHALLA STORE
+                <svg className="w-5 h-5 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
               </button>
             ) : (
               <Link
                 to="/peek"
-                className="btn-peek-sm"
+                title="Back to Mohalla Store"
+                className="w-10 h-10 shrink-0 rounded-full bg-neutral-900 hover:bg-neutral-800 border border-neutral-700/80 hover:border-neutral-500 text-neutral-200 hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95 group"
               >
-                ← BACK TO MOHALLA STORE
+                <svg className="w-5 h-5 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
               </Link>
             )}
             <div>
@@ -91,16 +205,19 @@ export function LendPage({ onBack }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            <Link
+              to="/recommendations"
+              className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer text-xs font-medium tracking-wide text-neutral-300"
+            >
+              Recommendations
+            </Link>
             <Link
               to="/radar"
               className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer text-xs font-medium tracking-wide text-neutral-300"
             >
               Mohalla Radar
             </Link>
-            <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-neutral-400 bg-neutral-900/90 border border-neutral-800 px-4 py-2 rounded-full w-fit">
-              <span>🛡️ 100% Verified Neighborhood Lends</span>
-            </div>
           </div>
         </div>
 
@@ -328,12 +445,49 @@ export function LendPage({ onBack }) {
                 </div>
               </div>
 
+              {/* Row 6: Item Condition */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-mono text-neutral-300">Item Condition</label>
+                <div className="flex flex-wrap gap-2">
+                  {["Brand New ✨", "Good Working 👍", "Fair / Vintage 📻"].map((cond) => (
+                    <button
+                      key={cond}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, condition: cond })}
+                      className={`text-xs font-mono px-3.5 py-2 rounded-full border transition-all cursor-pointer ${
+                        formData.condition === cond
+                          ? "bg-gradient-to-r from-[#0a3038] via-[#09414b] to-[#042028] text-teal-100 border-[#0c5360] font-bold shadow-md"
+                          : "bg-neutral-950/80 text-neutral-300 border-neutral-700/80 hover:border-neutral-500"
+                      }`}
+                    >
+                      {cond}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Error Message Display */}
+              {errorMessage && (
+                <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-xs px-4 py-3 rounded-2xl flex items-center gap-2.5 animate-fadeIn">
+                  <span className="text-base">⚠️</span>
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
               {/* Submit CTA Button */}
               <button
                 type="submit"
-                className="btn-peek w-full mt-2"
+                disabled={isSubmitting}
+                className="btn-peek w-full mt-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <span>LIST ITEM ON MOHALLA STORE</span>
+                {isSubmitting ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-teal-200 border-t-transparent rounded-full animate-spin" />
+                    <span>SAVING ITEM TO MOHALLA STORE...</span>
+                  </>
+                ) : (
+                  <span>LIST ITEM ON MOHALLA STORE</span>
+                )}
               </button>
             </div>
           </form>

@@ -1,22 +1,19 @@
 import { useEffect, useState } from "react";
 
-const BASE_SHELF = [
-  { name: "Bosch drill", state: "out with Imran · back sat", tilt: -2 },
-  { name: "Blue camping tent", state: "idle 41 days", tilt: 1.5 },
-  { name: "Rice cooker", state: "requested twice this week", tilt: -1 },
-  { name: "Ladder, 6 ft", state: "on the terrace", tilt: 2.5 },
-  { name: "Carrom board", state: "idle since diwali", tilt: -1.5 },
-];
-
 export default function LenderPanel({ currentUser, onAuthRequired }) {
-  const [shelfItems, setShelfItems] = useState(BASE_SHELF);
+  const [shelfItems, setShelfItems] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newItemName, setNewItemName] = useState("");
   const [newItemCategory, setNewItemCategory] = useState("Other");
   const [newItemDescription, setNewItemDescription] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const fetchLentItems = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setShelfItems([]);
+      return;
+    }
+    setLoading(true);
     try {
       const res = await fetch("http://localhost:8085/api/profile", {
         headers: {
@@ -25,16 +22,17 @@ export default function LenderPanel({ currentUser, onAuthRequired }) {
       });
       if (res.ok) {
         const data = await res.json();
-        // Map backend lent items structure to the UI display format
         const customItems = (data.lent || []).map((item) => ({
           name: item.itemName,
           state: `${item.category || "Other"} · ready to share`,
           tilt: (Math.random() - 0.5) * 4,
         }));
-        setShelfItems([...BASE_SHELF, ...customItems]);
+        setShelfItems(customItems);
       }
     } catch (err) {
       console.error("Error fetching lent items:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -98,24 +96,30 @@ export default function LenderPanel({ currentUser, onAuthRequired }) {
           <p className="font-mono text-[10px] font-light tracking-[0.3em] uppercase text-panel-note">
             on your shelf — {shelfItems.length} things
           </p>
-          <ul className="mt-7 space-y-6">
-            {shelfItems.map((item, i) => (
-              <li
-                key={`${item.name}-${i}`}
-                className="scatter-row animate-fade-in"
-                style={{
-                  marginLeft: `${(i % 3) * 22}px`,
-                  transform: `rotate(${item.tilt}deg)`,
-                  animationDelay: `${i * 70}ms`,
-                }}
-              >
-                <span className="font-display text-2xl font-bold tracking-wide">{item.name}</span>
-                <span className="font-mono text-[10px] font-light tracking-[0.28em] uppercase text-panel-note">
-                  {item.state}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {shelfItems.length > 0 ? (
+            <ul className="mt-7 space-y-6">
+              {shelfItems.map((item, i) => (
+                <li
+                  key={`${item.name}-${i}`}
+                  className="scatter-row animate-fade-in"
+                  style={{
+                    marginLeft: `${(i % 3) * 22}px`,
+                    transform: `rotate(${item.tilt}deg)`,
+                    animationDelay: `${i * 70}ms`,
+                  }}
+                >
+                  <span className="font-display text-2xl font-bold tracking-wide">{item.name}</span>
+                  <span className="font-mono text-[10px] font-light tracking-[0.28em] uppercase text-panel-note">
+                    {item.state}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-7 font-hand text-2xl text-panel-note">
+              {currentUser ? "your shelf is empty. put an item up for lending below!" : "sign in to view and manage items on your shelf."}
+            </p>
+          )}
 
           {showAddForm ? (
             <form onSubmit={handleAddShelfItem} className="mt-8 animate-fade-in space-y-5">

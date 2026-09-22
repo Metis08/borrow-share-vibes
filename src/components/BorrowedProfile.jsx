@@ -1,43 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import EditProfileModal from "@/components/EditProfileModal";
 
-const BASE_BORROWED = [
-  {
-    id: "proj",
-    name: "Epson projector",
-    lender: "Ravi · Gali 4",
-    daysLeft: 2,
-    since: "borrowed 12 Aug",
-    note: "keep the remote in the pouch",
-  },
-  {
-    id: "ladder",
-    name: "Folding ladder, 6 ft",
-    lender: "Sunita aunty",
-    daysLeft: 5,
-    since: "borrowed 9 Aug",
-    note: "return before her painter comes",
-  },
-  {
-    id: "degchi",
-    name: "Steel degchi 20L",
-    lender: "Sharma ji",
-    daysLeft: 0,
-    since: "borrowed 1 Aug",
-    note: "due today — he asked twice",
-  },
-];
-
-const REPLIES = [
-  "haan ji, no problem. keep it one more day.",
-  "aa jao shaam ko, main ghar pe hoon.",
-  "theek hai. bas thoda sambhal ke.",
-  "koi jaldi nahi, jab free ho tab.",
-];
-
-export default function BorrowedProfile({ currentUser, onLocationUpdated }) {
-  const [borrowedItems, setBorrowedItems] = useState(BASE_BORROWED);
+export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpenMessages }) {
+  const [borrowedItems, setBorrowedItems] = useState([]);
   const [lentItems, setLentItems] = useState([]);
-  const [openId, setOpenId] = useState("proj");
+  const [openId, setOpenId] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [profileMeta, setProfileMeta] = useState({ 
     phone: "", 
     area: "", 
@@ -46,18 +14,6 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated }) {
     latitude: 0,
     longitude: 0
   });
-  
-  const [threads, setThreads] = useState(() =>
-    Object.fromEntries(
-      BASE_BORROWED.map((b) => [
-        b.id,
-        [{ from: "them", text: `${b.name} — ${b.note}` }],
-      ]),
-    ),
-  );
-  
-  const [draft, setDraft] = useState("");
-  const endRef = useRef(null);
 
   const fetchProfileData = async () => {
     if (!currentUser) return;
@@ -76,16 +32,18 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated }) {
           name: b.itemName,
           lender: b.lender,
           daysLeft: b.daysLeft,
-          since: b.since,
+          since: b.since || "active borrow",
           note: b.note,
         }));
         
-        setBorrowedItems([...BASE_BORROWED, ...dbBorrowed]);
+        setBorrowedItems(dbBorrowed);
         setLentItems(data.lent || []);
         setProfileMeta({
+          fullName: data.fullName || currentUser?.username || "",
+          bio: data.bio || "",
           phone: data.phone || "",
           area: data.area || "",
-          shelfName: data.shelfName || "",
+          shelfName: data.shelfName || `${currentUser?.username || "My"}'s Shelf`,
           locationSharingEnabled: data.locationSharingEnabled || false,
           latitude: data.latitude || 0,
           longitude: data.longitude || 0,
@@ -163,38 +121,7 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated }) {
     }
   };
 
-  useEffect(() => {
-    // Generate thread slots for newly loaded/added items
-    setThreads((prev) => {
-      const copy = { ...prev };
-      borrowedItems.forEach((b) => {
-        if (!copy[b.id]) {
-          copy[b.id] = [{ from: "them", text: `${b.name} — ${b.note}` }];
-        }
-      });
-      return copy;
-    });
-  }, [borrowedItems]);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [threads, openId]);
-
-  const active = borrowedItems.find((b) => b.id === openId) ?? borrowedItems[0] ?? BASE_BORROWED[0];
-
-  const send = (e) => {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text) return;
-    setDraft("");
-    
-    const curId = active.id;
-    setThreads((t) => ({ ...t, [curId]: [...(t[curId] || []), { from: "me", text }] }));
-    const reply = REPLIES[Math.floor(Math.random() * REPLIES.length)];
-    setTimeout(() => {
-      setThreads((t) => ({ ...t, [curId]: [...(t[curId] || []), { from: "them", text: reply }] }));
-    }, 800);
-  };
+  const active = borrowedItems.find((b) => b.id === openId) ?? borrowedItems[0] ?? null;
 
   return (
     <div className="grid gap-12 lg:grid-cols-[1.1fr_1.1fr] lg:gap-16">
@@ -236,6 +163,15 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated }) {
                   {profileMeta.locationSharingEnabled ? "Active" : "Disabled"}
                 </button>
               </div>
+            </div>
+            <div className="sm:border-l sm:border-white/10 sm:pl-6 flex items-center">
+              <button
+                type="button"
+                onClick={() => setShowEditModal(true)}
+                className="px-3 py-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 rounded text-[9px] font-mono tracking-widest uppercase transition-all cursor-pointer font-bold"
+              >
+                ✏️ Edit Profile
+              </button>
             </div>
           </div>
         </div>
@@ -301,44 +237,66 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated }) {
         </div>
       </div>
 
-      {/* Column 2: Chat Simulator */}
-      <div className="lg:pt-4">
-        {active ? (
-          <>
-            <p className="eyebrow text-panel-note">chat with {active.lender}</p>
-            <div className="mt-5 flex h-[320px] flex-col gap-3 overflow-y-auto pr-1">
-              {(threads[active.id] || []).map((m, i) => (
-                <div key={i} className={m.from === "me" ? "chat-bubble me" : "chat-bubble them"}>
-                  {m.text}
-                </div>
-              ))}
-              <div ref={endRef} />
-            </div>
+      {/* Column 2: Direct Real Messaging Integration */}
+      <div className="lg:pt-4 flex flex-col justify-between">
+        <div className="bg-[#18191c] border border-neutral-800 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-mono text-xs text-neutral-400 uppercase tracking-widest font-semibold">
+              REAL-TIME NEIGHBOUR MESSAGING
+            </span>
+          </div>
 
-            <form onSubmit={send} className="mt-4 flex items-center gap-4">
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="ek din aur mil jayega?"
-                className="ink-field font-display !text-lg"
-                aria-label={`Message ${active.lender}`}
-              />
+          {active ? (
+            <div className="space-y-3">
+              <h3 className="text-xl font-bold text-white font-display">
+                Chatting with {active.lender}
+              </h3>
+              <p className="text-xs text-neutral-400 leading-relaxed font-mono">
+                Item: <span className="text-amber-300 font-bold">{active.name}</span> ({active.since})
+              </p>
               <button
-                type="submit"
-                className="ink-link font-mono text-[10px] font-light uppercase tracking-[0.34em]"
+                type="button"
+                onClick={() => onOpenMessages && onOpenMessages()}
+                className="w-full bg-[#facc15] hover:bg-yellow-300 text-black font-extrabold text-xs uppercase px-5 py-3 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                Send
+                <span>💬 Open Conversation in Messages Tab →</span>
               </button>
-            </form>
-          </>
-        ) : (
-          <p className="font-hand text-2xl text-panel-note">Select an item to chat</p>
-        )}
+            </div>
+          ) : (
+            <div className="text-center py-6 space-y-2">
+              <span className="text-3xl">💬</span>
+              <p className="font-hand text-xl text-neutral-400">
+                Select a borrowed item or accept a request to open live chat
+              </p>
+            </div>
+          )}
+        </div>
 
         <p className="mt-6 font-mono text-[10px] font-light uppercase leading-loose tracking-[0.28em] text-panel-note">
           returns happen at the counter · no deposits, only faces
         </p>
       </div>
+
+      {/* Edit Profile Modal */}
+      <EditProfileModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        currentProfile={{
+          phone: profileMeta.phone,
+          area: profileMeta.area,
+          shelfName: profileMeta.shelfName,
+        }}
+        currentUser={currentUser}
+        onSaveSuccess={(updated) => {
+          setProfileMeta((prev) => ({
+            ...prev,
+            phone: updated.phone,
+            area: updated.area,
+            shelfName: updated.shelfName,
+          }));
+        }}
+      />
     </div>
   );
 }

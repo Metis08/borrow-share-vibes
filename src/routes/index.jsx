@@ -11,7 +11,7 @@ import MohallaRadar from "@/components/MohallaRadar";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Mohalla Store — Borrow it. Return it." },
+      { title: "mohalla store" },
       {
         name: "description",
         content:
@@ -184,7 +184,7 @@ function Index() {
 
   const handleAuthRequired = (reasonMessage) => {
     setAuthTriggerMsg(reasonMessage);
-    setAuthMode("login");
+    setAuthMode("register");
     setShowAuthModal(true);
   };
 

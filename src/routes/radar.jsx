@@ -164,10 +164,20 @@ export function MohallaRadarPage() {
         attributionControl: false
       });
 
-      // Dark CartoDB / Mapbox Dark Matter vector tile layer
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
+      // 1. Dark Base Map with Light Grey Area Lines (roads, avenues, boundaries)
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
+        maxZoom: 20,
         subdomains: "abcd",
+        className: "mohalla-dark-map-base",
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      }).addTo(map);
+
+      // 2. Dedicated Map Labels Layer with Crisp Light Grey Area & Locality Text
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", {
+        maxZoom: 20,
+        subdomains: "abcd",
+        className: "mohalla-dark-map-labels",
+        zIndex: 10
       }).addTo(map);
 
       // Custom Dark Teal User Pin
@@ -178,7 +188,7 @@ export function MohallaRadarPage() {
             <div class="w-9 h-9 rounded-full bg-[#083842] border-2 border-white/80 flex items-center justify-center text-white text-sm font-bold shadow-2xl animate-pulse">
               📍
             </div>
-            <div class="absolute -top-7 bg-neutral-900 text-teal-100 font-mono text-[10px] px-2.5 py-0.5 rounded-full border border-neutral-800 whitespace-nowrap shadow-xl">
+            <div class="absolute -top-7 bg-neutral-900 text-neutral-200 font-mono text-[10px] px-2.5 py-0.5 rounded-full border border-neutral-700 whitespace-nowrap shadow-xl">
               You (Block E)
             </div>
           </div>
@@ -188,23 +198,23 @@ export function MohallaRadarPage() {
       });
       L.marker([centerLat, centerLng], { icon: userIcon }).addTo(map);
 
-      // Add Concentric Radar Rings
+      // Concentric Radar Area Rings in Dark Grey Lines
       L.circle([centerLat, centerLng], {
         radius: 100,
-        color: "#083842",
-        weight: 1,
+        color: "#4b5563",
+        weight: 1.5,
         dashArray: "4, 6",
-        fillColor: "#09414b",
-        fillOpacity: 0.08
+        fillColor: "#1f2937",
+        fillOpacity: 0.12
       }).addTo(map);
 
       L.circle([centerLat, centerLng], {
         radius: 250,
-        color: "#083842",
-        weight: 1,
+        color: "#374151",
+        weight: 1.5,
         dashArray: "4, 8",
-        fillColor: "#083842",
-        fillOpacity: 0.04
+        fillColor: "#111827",
+        fillOpacity: 0.06
       }).addTo(map);
 
       const markersGroup = L.layerGroup().addTo(map);
@@ -238,8 +248,8 @@ export function MohallaRadarPage() {
       const markerIcon = L.divIcon({
         className: "custom-item-marker",
         html: `
-          <div class="group relative cursor-pointer flex flex-col items-center">
-            <div class="w-11 h-11 rounded-2xl bg-[#0d0f17] border border-neutral-800 shadow-2xl p-1 flex items-center justify-center transform transition-transform group-hover:scale-110">
+          <div class="group relative cursor-pointer flex flex-col items-center select-none">
+            <div class="w-11 h-11 rounded-2xl bg-[#0d0f17] border border-neutral-700 shadow-2xl p-1 flex items-center justify-center transform transition-transform group-hover:scale-110">
               <img src="${item.image}" alt="${item.title}" class="w-full h-full object-contain rounded-xl" />
             </div>
             <div class="mt-1 bg-neutral-950/90 text-neutral-300 text-[10px] font-mono px-2 py-0.5 rounded-md border border-neutral-800 whitespace-nowrap shadow-md">
@@ -253,7 +263,7 @@ export function MohallaRadarPage() {
 
       const popupContent = `
         <div style="background-color: #0d0f17; border: 1px solid #1e293b; border-radius: 1.25rem; padding: 14px; color: white; width: 230px; font-family: sans-serif; box-shadow: 0 20px 40px rgba(0,0,0,0.9);">
-          <div style="width: 100%; height: 100px; margin-bottom: 10px; border-radius: 12px; overflow: hidden; background: #04090d; display: flex; align-items: center; justify-center: center;">
+          <div style="width: 100%; height: 100px; margin-bottom: 10px; border-radius: 12px; overflow: hidden; background: #04090d; display: flex; align-items: center; justify-content: center;">
             <img src="${item.image}" alt="${item.title}" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
           </div>
           <div style="font-size: 10px; font-family: monospace; color: #94a3b8; margin-bottom: 3px;">${item.category} • ${item.distance}</div>

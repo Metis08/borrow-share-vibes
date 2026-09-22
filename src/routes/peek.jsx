@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { LendPage } from "./lend";
+import MohallaRecommendationsView from "@/components/MohallaRecommendationsView";
 
 export const Route = createFileRoute("/peek")({
   head: () => ({
     meta: [
-      { title: "Welcome to the Mohalla Store" },
+      { title: "mohalla store" },
       {
         name: "description",
         content: "Clean editorial archival collage of community objects in Mohalla Store.",
@@ -16,20 +17,98 @@ export const Route = createFileRoute("/peek")({
 });
 
 function RepositoryOfRemnantsPage() {
-  const [activeItem, setActiveItem] = useState("radio");
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("mohalla_user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [activeItem, setActiveItem] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
-  const [activeNavTab, setActiveNavTab] = useState("explore"); // "explore" | "stories" | "messages" | "profile"
+  const [activeNavTab, setActiveNavTab] = useState("explore"); // "explore" | "stories" | "recommendations" | "messages" | "profile"
   const [showFlyer, setShowFlyer] = useState(false);
+  const [dbItems, setDbItems] = useState({});
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowFlyer(true);
-    }, 5000);
-    return () => clearTimeout(timer);
+    const fetchDbItems = async () => {
+      try {
+        const res = await fetch("http://localhost:8085/api/items");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const mapped = {};
+            data.forEach((item) => {
+              const key = `lent_${item.id}`;
+              const title = item.itemName || item.item_name || "Mohalla Item";
+              const owner = item.lenderName || item.username || "Padosi";
+              const category = item.category || "Other";
+              const area = item.area || "Nearby";
+              const image = item.imageUrl || "/vintage-radio.png";
+              mapped[key] = {
+                id: `LEND-${item.id}`,
+                realId: item.id,
+                title: title,
+                code: `LEND-${item.id}`,
+                owner: owner,
+                rawUsername: item.username || owner,
+                distance: area,
+                category: category,
+                status: item.status ? (item.status === "active" ? "Available Now" : item.status) : "Available Now",
+                desc: item.description || "Listed in Mohalla Store.",
+                phone: item.phone || "",
+                duration: item.duration || "7 Days",
+                condition: item.condition || "Good Working 👍",
+                image: image,
+              };
+            });
+            setDbItems(mapped);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch DB items:", err);
+      }
+    };
+    fetchDbItems();
+  }, [activeNavTab]);
+
+  useEffect(() => {
+    const keys = Object.keys(dbItems);
+    if (keys.length > 0) {
+      if (!activeItem || !dbItems[activeItem]) {
+        setActiveItem(keys[0]);
+      }
+    } else {
+      setActiveItem(null);
+    }
+  }, [dbItems, activeItem]);
+
+  useEffect(() => {
+    try {
+      const hasSeenFlyer = localStorage.getItem("mohalla_flyer_seen");
+      if (!hasSeenFlyer) {
+        const timer = setTimeout(() => {
+          setShowFlyer(true);
+          try {
+            localStorage.setItem("mohalla_flyer_seen", "true");
+          } catch {}
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
+    } catch {}
   }, []);
+
+  const handleDismissFlyer = () => {
+    setShowFlyer(false);
+    try {
+      localStorage.setItem("mohalla_flyer_seen", "true");
+    } catch {}
+  };
 
   // Borrowing Form State inside Glass Panel
   const [borrowingItemKey, setBorrowingItemKey] = useState(null); // null or item key e.g. "radio"
@@ -164,103 +243,44 @@ function RepositoryOfRemnantsPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const itemDetails = {
-    radio: {
-      id: "E 1009",
-      title: "Vintage Orange Transistor Radio",
-      code: "1963",
-      owner: "Aarav Sharma",
-      distance: "150m away",
-      category: "Electronics",
-      status: "Available Now",
-      desc: "A spectrocolorimeter is a form of spectrophotometer that can calculate tristimulus values, or the light intensity of primary color values in a sample.",
-      image: "/vintage-radio.png",
-    },
-    calculator: {
-      id: "CASIO-991",
-      title: "Pink Casio Scientific Calculator",
-      code: "2nd Edition",
-      owner: "Riya Verma",
-      distance: "220m away",
-      category: "Electronics",
-      status: "Available Now",
-      desc: "High-precision natural display calculation unit borrowed for university exam emergencies and late-night physics problem sets.",
-      image: "/casio-calculator.png",
-    },
-    racket: {
-      id: "YONEX-77",
-      title: "Vintage Badminton Racket",
-      code: "GRAPHITE",
-      owner: "Karan Mehta",
-      distance: "80m away",
-      category: "Outdoor",
-      status: "Available Now",
-      desc: "Classic tight-strung badminton racket kept in mint condition. Ideal for evening neighborhood matches and terrace games.",
-      image: "/badminton-racket.png",
-    },
-    camera: {
-      id: "LEICA-M6",
-      title: "Leica M6 Rangefinder Camera",
-      code: "1984",
-      owner: "Ananya Iyer",
-      distance: "300m away",
-      category: "Electronics",
-      status: "Reserved",
-      desc: "Mechanical 35mm film rangefinder preserved by Riya for 3 years. Pristine shutter accuracy and original leatherette finish.",
-      image: "/leica-camera.png",
-    },
-    jenga: {
-      id: "JENGA-WOOD",
-      title: "Hardwood Jenga Tower Set",
-      code: "54 BLOCKS",
-      owner: "Vikram Malhotra",
-      distance: "190m away",
-      category: "Books & Games",
-      status: "Available Now",
-      desc: "Precision-cut solid hardwood blocks for weekend board game nights and balcony building challenges.",
-      image: "/jenga.png",
-    },
-    sleepingBag: {
-      id: "RUMPL-ROLL",
-      title: "Rolled Outdoor Camping Blanket",
-      code: "SNOW PEAK",
-      owner: "Priya Nair",
-      distance: "400m away",
-      category: "Outdoor",
-      status: "Available Now",
-      desc: "Insulated weather-resistant rolled outdoor blanket with leather carry straps. Perfect for stargazing trips.",
-      image: "/sleeping-bag.png",
-    },
-    hammer: {
-      id: "TOOL-BOX",
-      title: "Heavy Duty Claw Steel Hammer",
-      code: "CHROME 16OZ",
-      owner: "Kabir Singh",
-      distance: "120m away",
-      category: "Tools",
-      status: "Available Now",
-      desc: "Forged steel claw hammer with ergonomic rubber grip. Ideal for DIY framing, hanging frames, and repair projects.",
-      image: "/hammer.png",
-    },
-    books: {
-      id: "MADELINE-SET",
-      title: "Madeline Hardcover Book Collection",
-      code: "LUDWIG BEMELMANS",
-      owner: "Meera Gupta",
-      distance: "350m away",
-      category: "Books & Games",
-      status: "Available Now",
-      desc: "Vintage illustrated children's storybook collection featuring classic artwork and original Paris adventure tales.",
-      image: "/books-stack.png",
-    },
+  const itemDetails = dbItems;
+
+  const selectItemByKeyword = (keyword) => {
+    const keys = Object.keys(itemDetails);
+    const found = keys.find((k) => {
+      const it = itemDetails[k];
+      return (
+        k.toLowerCase().includes(keyword.toLowerCase()) ||
+        (it.title && it.title.toLowerCase().includes(keyword.toLowerCase())) ||
+        (it.category && it.category.toLowerCase().includes(keyword.toLowerCase()))
+      );
+    });
+    if (found) {
+      setActiveItem(found);
+    } else if (keys.length > 0) {
+      setActiveItem(keys[0]);
+    }
+    document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const categories = ["All", "Electronics", "Outdoor", "Books & Games", "Tools"];
+  const categories = ["All", "Electronics & Gear", "Tools & Repair", "Books & Games", "Household", "Other"];
 
   const filteredItems = Object.entries(itemDetails).filter(([_, item]) => {
-    const matchesCategory = activeCategory === "All" || item.category === activeCategory;
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.owner.toLowerCase().includes(searchQuery.toLowerCase());
+    const itemCat = (item.category || "").toLowerCase();
+    const activeCat = activeCategory.toLowerCase();
+    const matchesCategory =
+      activeCategory === "All" ||
+      itemCat === activeCat ||
+      itemCat.includes(activeCat) ||
+      activeCat.includes(itemCat);
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      (item.title && item.title.toLowerCase().includes(q)) ||
+      (item.owner && item.owner.toLowerCase().includes(q)) ||
+      (item.desc && item.desc.toLowerCase().includes(q)) ||
+      (item.category && item.category.toLowerCase().includes(q)) ||
+      (item.distance && item.distance.toLowerCase().includes(q));
     return matchesCategory && matchesSearch;
   });
 
@@ -276,6 +296,11 @@ function RepositoryOfRemnantsPage() {
         <header className="w-full max-w-7xl mx-auto px-6 pt-6 pb-4 flex items-center justify-between border-b border-neutral-800/60 relative z-10">
           {/* Left Brand Title in Hindi */}
           <Link to="/" className="flex items-center gap-3 group">
+            <img
+              src="/favicon.png"
+              alt="Mohalla Store Logo"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-teal-500/30 object-contain shadow-sm group-hover:scale-105 transition-transform"
+            />
             <span className="text-xl sm:text-2xl font-bold tracking-tight text-[#f5e6c8] group-hover:text-white transition-colors">
               मोहल्ला स्टोर
             </span>
@@ -304,6 +329,17 @@ function RepositoryOfRemnantsPage() {
               }`}
             >
               Mohalla Stories
+            </button>
+            <button
+              onClick={() => {
+                setActiveNavTab("recommendations");
+                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                activeNavTab === "recommendations" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
+              }`}
+            >
+              Recommendations
             </button>
             <button
               onClick={() => {
@@ -337,12 +373,23 @@ function RepositoryOfRemnantsPage() {
 
           {/* Right CTA Button: + Lend Something */}
           <div className="flex items-center gap-4">
-            <Link
-              to="/lend"
-              className="btn-peek-sm"
-            >
-              + LEND SOMETHING
-            </Link>
+            <div className="relative group/lend">
+              <Link
+                to="/lend"
+                className="btn-peek-sm"
+              >
+                + LEND SOMETHING
+              </Link>
+              
+              {/* Hanging Nimbu Mirchi Totem */}
+              <div className="absolute top-full -right-2 sm:-right-3 -mt-[2px] pointer-events-none z-30 flex flex-col items-end">
+                <img
+                  src="/nimbu-mirchi.png"
+                  alt="Nimbu Mirchi Nazar Battu"
+                  className="w-24 sm:w-32 md:w-40 lg:w-48 h-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.95)] animate-nimbu-sway origin-top"
+                />
+              </div>
+            </div>
           </div>
         </header>
 
@@ -471,13 +518,8 @@ function RepositoryOfRemnantsPage() {
 
             {/* OBJECT 1: MADELINE BOOKS STACK (LEFT) */}
             <div
-              onClick={() => {
-                setActiveItem("books");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`absolute left-[-6%] sm:left-[-4%] top-[-6%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50 ${
-                activeItem === "books" ? "z-40" : ""
-              }`}
+              onClick={() => selectItemByKeyword("book")}
+              className="absolute left-[-6%] sm:left-[-4%] top-[-6%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50"
             >
               <img
                 src="/books-stack.png"
@@ -488,13 +530,8 @@ function RepositoryOfRemnantsPage() {
 
             {/* OBJECT 2: PINK CASIO CALCULATOR (MID TOP LEFT) */}
             <div
-              onClick={() => {
-                setActiveItem("calculator");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`absolute left-[16%] sm:left-[22%] top-[6%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50 ${
-                activeItem === "calculator" ? "z-40" : ""
-              }`}
+              onClick={() => selectItemByKeyword("calculator")}
+              className="absolute left-[16%] sm:left-[22%] top-[6%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50"
             >
               <img
                 src="/casio-calculator.png"
@@ -505,13 +542,8 @@ function RepositoryOfRemnantsPage() {
 
             {/* OBJECT 3: BADMINTON RACKET (TILTED 20 DEGREES TOWARDS LEFT FROM BOTTOM) */}
             <div
-              onClick={() => {
-                setActiveItem("racket");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`absolute left-[6%] sm:left-[12%] top-[18%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50 ${
-                activeItem === "racket" ? "z-40" : ""
-              }`}
+              onClick={() => selectItemByKeyword("racket")}
+              className="absolute left-[6%] sm:left-[12%] top-[18%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50"
             >
               <img
                 src="/badminton-racket.png"
@@ -522,13 +554,8 @@ function RepositoryOfRemnantsPage() {
 
             {/* OBJECT 4: STEEL CLAW HAMMER (MOVED LEFT BEHIND RADIO) */}
             <div
-              onClick={() => {
-                setActiveItem("hammer");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`absolute right-[32%] sm:right-[38%] top-[8%] sm:top-[12%] z-[15] transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50 ${
-                activeItem === "hammer" ? "z-40" : ""
-              }`}
+              onClick={() => selectItemByKeyword("hammer")}
+              className="absolute right-[32%] sm:right-[38%] top-[8%] sm:top-[12%] z-[15] transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50"
             >
               <img
                 src="/hammer.png"
@@ -539,13 +566,8 @@ function RepositoryOfRemnantsPage() {
 
             {/* OBJECT 5: CENTERPIECE VINTAGE ORANGE RADIO */}
             <div
-              onClick={() => {
-                setActiveItem("radio");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`relative z-20 transition-transform duration-300 ease-out cursor-pointer flex items-center justify-center transform hover:scale-105 hover:z-50 ${
-                activeItem === "radio" ? "z-40" : ""
-              }`}
+              onClick={() => selectItemByKeyword("radio")}
+              className="relative z-20 transition-transform duration-300 ease-out cursor-pointer flex items-center justify-center transform hover:scale-105 hover:z-50"
             >
               <img
                 src="/vintage-radio.png"
@@ -556,13 +578,8 @@ function RepositoryOfRemnantsPage() {
 
             {/* OBJECT 6: JENGA BLOCK TOWER (TOP RIGHT CLOSER TO RADIO) */}
             <div
-              onClick={() => {
-                setActiveItem("jenga");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`absolute right-[28%] sm:right-[32%] top-[-2%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50 ${
-                activeItem === "jenga" ? "z-40" : ""
-              }`}
+              onClick={() => selectItemByKeyword("jenga")}
+              className="absolute right-[28%] sm:right-[32%] top-[-2%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50"
             >
               <img
                 src="/jenga.png"
@@ -573,13 +590,8 @@ function RepositoryOfRemnantsPage() {
 
             {/* OBJECT 7: LEICA CAMERA (UPPER RIGHT) */}
             <div
-              onClick={() => {
-                setActiveItem("camera");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`absolute right-[-10%] sm:right-[-6%] top-[-16%] sm:top-[-14%] z-40 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50 ${
-                activeItem === "camera" ? "z-40" : ""
-              }`}
+              onClick={() => selectItemByKeyword("camera")}
+              className="absolute right-[-10%] sm:right-[-6%] top-[-16%] sm:top-[-14%] z-40 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50"
             >
               <img
                 src="/leica-camera.png"
@@ -590,13 +602,8 @@ function RepositoryOfRemnantsPage() {
 
             {/* OBJECT 8: ROLLED CAMPING SLEEPING BAG (LOWER RIGHT) */}
             <div
-              onClick={() => {
-                setActiveItem("sleepingBag");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`absolute right-[-8%] sm:right-[-4%] bottom-[-10%] sm:bottom-[-6%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50 ${
-                activeItem === "sleepingBag" ? "z-40" : ""
-              }`}
+              onClick={() => selectItemByKeyword("sleeping")}
+              className="absolute right-[-8%] sm:right-[-4%] bottom-[-10%] sm:bottom-[-6%] z-30 transition-transform duration-300 ease-out cursor-pointer transform hover:scale-106 hover:z-50"
             >
               <img
                 src="/sleeping-bag.png"
@@ -643,6 +650,11 @@ function RepositoryOfRemnantsPage() {
             <div className="sticky top-0 z-40 bg-[#141418]/95 backdrop-blur-xl border-b border-neutral-800/80 pb-4 pt-2 flex items-center justify-between -mx-6 sm:-mx-10 md:-mx-12 px-6 sm:px-10 md:px-12 -mt-6 sm:-mt-10 md:-mt-12 rounded-t-[2.5rem]">
               {/* Brand Title */}
               <Link to="/" className="flex items-center gap-3 group">
+                <img
+                  src="/favicon.png"
+                  alt="Mohalla Store Logo"
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-teal-500/30 object-contain shadow-sm group-hover:scale-105 transition-transform"
+                />
                 <span className="text-lg sm:text-xl font-bold tracking-tight text-[#f5e6c8] group-hover:text-white transition-colors">
                   मोहल्ला स्टोर
                 </span>
@@ -665,6 +677,14 @@ function RepositoryOfRemnantsPage() {
                   }`}
                 >
                   Mohalla Stories
+                </button>
+                <button
+                  onClick={() => setActiveNavTab("recommendations")}
+                  className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
+                    activeNavTab === "recommendations" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
+                  }`}
+                >
+                  Recommendations
                 </button>
                 <button
                   onClick={() => setActiveNavTab("messages")}
@@ -709,10 +729,20 @@ function RepositoryOfRemnantsPage() {
               </div>
             </div>
 
-            {/* TAB CONTENT: LEND FORM, MOHALLA STORIES OR EXPLORE ITEMS */}
+            {/* TAB CONTENT: LEND FORM, RECOMMENDATIONS, MOHALLA STORIES OR EXPLORE ITEMS */}
             {activeNavTab === "lend" ? (
               <div className="animate-fadeIn">
                 <LendPage onBack={() => setActiveNavTab("explore")} />
+              </div>
+            ) : activeNavTab === "recommendations" ? (
+              <div className="animate-fadeIn">
+                <MohallaRecommendationsView
+                  currentUser={currentUser}
+                  onRequireAuth={(callback) => {
+                    if (callback) callback();
+                    return true;
+                  }}
+                />
               </div>
             ) : activeNavTab === "stories" ? (
               <div className="flex flex-col gap-8 py-2 animate-fadeIn">
@@ -1322,16 +1352,10 @@ function RepositoryOfRemnantsPage() {
                       <span className="font-mono text-xs text-neutral-400 uppercase tracking-wider font-medium">
                         CURRENTLY BORROWED
                       </span>
-                      <span className="text-xs text-neutral-500 font-mono">1 Active</span>
+                      <span className="text-xs text-neutral-500 font-mono">0 Active</span>
                     </div>
                     <div className="bg-[#191a1c] p-4 rounded-2xl border border-[#2d2e30] flex items-center justify-between">
-                      <div>
-                        <h4 className="text-base font-bold text-white">Vintage Transistor Radio</h4>
-                        <p className="text-xs text-neutral-400 font-mono mt-0.5">Lender: Aarav Sharma (Block E)</p>
-                      </div>
-                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-mono px-3 py-1 rounded-full">
-                        Due in 2 days
-                      </span>
+                      <p className="text-xs text-neutral-400 font-mono">No active borrowed items currently.</p>
                     </div>
                   </div>
 
@@ -1340,17 +1364,44 @@ function RepositoryOfRemnantsPage() {
                       <span className="font-mono text-xs text-neutral-400 uppercase tracking-wider font-medium">
                         MY ACTIVE LENDS
                       </span>
-                      <span className="text-xs text-neutral-500 font-mono">1 Active</span>
-                    </div>
-                    <div className="bg-[#191a1c] p-4 rounded-2xl border border-[#2d2e30] flex items-center justify-between">
-                      <div>
-                        <h4 className="text-base font-bold text-white">Casio Scientific Calculator</h4>
-                        <p className="text-xs text-neutral-400 font-mono mt-0.5">Borrower: Rohan Verma (Block B)</p>
-                      </div>
-                      <span className="bg-neutral-800 text-neutral-300 border border-neutral-700 text-xs font-mono px-3 py-1 rounded-full">
-                        Active Borrow
+                      <span className="text-xs text-neutral-500 font-mono">
+                        {Object.values(dbItems).filter(item => {
+                          const u = currentUser?.username?.toLowerCase() || "mahek09";
+                          return (item.rawUsername && item.rawUsername.toLowerCase() === u) ||
+                                 (item.owner && item.owner.toLowerCase() === u);
+                        }).length} Active
                       </span>
                     </div>
+                    {Object.values(dbItems).filter(item => {
+                      const u = currentUser?.username?.toLowerCase() || "mahek09";
+                      return (item.rawUsername && item.rawUsername.toLowerCase() === u) ||
+                             (item.owner && item.owner.toLowerCase() === u);
+                    }).length > 0 ? (
+                      Object.values(dbItems).filter(item => {
+                        const u = currentUser?.username?.toLowerCase() || "mahek09";
+                        return (item.rawUsername && item.rawUsername.toLowerCase() === u) ||
+                               (item.owner && item.owner.toLowerCase() === u);
+                      }).map((item) => (
+                        <div key={item.id} className="bg-[#191a1c] p-4 rounded-2xl border border-[#2d2e30] flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shrink-0">
+                              <img src={item.image} alt={item.title} className="max-h-full max-w-full object-contain" />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-white">{item.title}</h4>
+                              <p className="text-[11px] text-neutral-400 font-mono">{item.category} · {item.distance}</p>
+                            </div>
+                          </div>
+                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-mono px-2.5 py-1 rounded-full">
+                            {item.status}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="bg-[#191a1c] p-4 rounded-2xl border border-[#2d2e30] flex items-center justify-between text-neutral-400 text-xs font-mono">
+                        <span>No items lent yet. Lend an item to share!</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1789,45 +1840,64 @@ function RepositoryOfRemnantsPage() {
 
                 {/* Grid of Neighborhood Remnants Cards (Screen Wide 4-column layout) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pt-2">
-                  {filteredItems.map(([key, item]) => (
-                    <div
-                      key={key}
-                      onClick={() => setBorrowingItemKey(key)}
-                      className={`group relative bg-neutral-900/50 hover:bg-neutral-800/60 border rounded-2xl p-5 flex flex-col justify-between transition-colors duration-200 cursor-pointer ${
-                        activeItem === key
-                          ? "border-[#0c5360] bg-[#09414b]/20"
-                          : "border-neutral-800 hover:border-neutral-700"
-                      }`}
-                    >
-                      {/* Status Badge */}
-                      <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400 mb-3">
-                        <span className="text-neutral-500">{item.code}</span>
-                        <span className="text-emerald-400 bg-emerald-400/10 px-2.5 py-0.5 rounded-full border border-emerald-400/20">
-                          {item.status}
-                        </span>
+                  {filteredItems.length === 0 ? (
+                    <div className="col-span-full py-16 text-center flex flex-col items-center justify-center gap-4 bg-neutral-900/40 rounded-3xl border border-neutral-800">
+                      <div className="w-16 h-16 rounded-full bg-neutral-800/80 flex items-center justify-center text-3xl">
+                        📦
                       </div>
-
-                      {/* Item Thumbnail */}
-                      <div className="w-full h-36 flex items-center justify-center my-2 p-2">
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className="max-h-full max-w-full object-contain transform group-hover:scale-110 transition-transform duration-300"
-                        />
+                      <div>
+                        <h4 className="text-lg font-bold text-white">No items listed in your Mohalla yet</h4>
+                        <p className="text-xs text-neutral-400 mt-1 max-w-sm">
+                          {Object.keys(itemDetails).length === 0
+                            ? "Only real items recorded in the database appear here. Lend something to start sharing with your neighbors!"
+                            : "No items match your active search or category filter."}
+                        </p>
                       </div>
+                      <Link to="/lend" className="btn-peek-sm mt-2">
+                        + LEND SOMETHING
+                      </Link>
+                    </div>
+                  ) : (
+                    filteredItems.map(([key, item]) => (
+                      <div
+                        key={key}
+                        onClick={() => setBorrowingItemKey(key)}
+                        className={`group relative bg-neutral-900/50 hover:bg-neutral-800/60 border rounded-2xl p-5 flex flex-col justify-between transition-colors duration-200 cursor-pointer ${
+                          activeItem === key
+                            ? "border-[#0c5360] bg-[#09414b]/20"
+                            : "border-neutral-800 hover:border-neutral-700"
+                        }`}
+                      >
+                        {/* Status Badge */}
+                        <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400 mb-3">
+                          <span className="text-neutral-500">{item.code}</span>
+                          <span className="text-emerald-400 bg-emerald-400/10 px-2.5 py-0.5 rounded-full border border-emerald-400/20">
+                            {item.status}
+                          </span>
+                        </div>
 
-                      {/* Info */}
-                      <div className="mt-3">
-                        <h4 className="text-sm font-semibold text-white group-hover:text-teal-200 transition-colors line-clamp-1">
-                          {item.title}
-                        </h4>
-                        <div className="flex items-center justify-between text-xs text-neutral-400 mt-1.5">
-                          <span>{item.owner}</span>
-                          <span className="font-mono text-neutral-500 text-[11px]">{item.distance}</span>
+                        {/* Item Thumbnail */}
+                        <div className="w-full h-36 flex items-center justify-center my-2 p-2">
+                          <img
+                            src={item.image}
+                            alt={item.title}
+                            className="max-h-full max-w-full object-contain transform group-hover:scale-110 transition-transform duration-300"
+                          />
+                        </div>
+
+                        {/* Info */}
+                        <div className="mt-3">
+                          <h4 className="text-sm font-semibold text-white group-hover:text-teal-200 transition-colors line-clamp-1">
+                            {item.title}
+                          </h4>
+                          <div className="flex items-center justify-between text-xs text-neutral-400 mt-1.5">
+                            <span>{item.owner}</span>
+                            <span className="font-mono text-neutral-500 text-[11px]">{item.distance}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </>
             )}
@@ -1856,7 +1926,7 @@ function RepositoryOfRemnantsPage() {
         {showFlyer && (
           <div 
             className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md transition-all duration-500 animate-fadeIn"
-            onClick={() => setShowFlyer(false)}
+            onClick={handleDismissFlyer}
           >
             <div 
               className="relative max-w-md sm:max-w-lg w-full flex flex-col items-center animate-fly-in"
@@ -1865,7 +1935,7 @@ function RepositoryOfRemnantsPage() {
               {/* Top Close Cross Button */}
               <button
                 type="button"
-                onClick={() => setShowFlyer(false)}
+                onClick={handleDismissFlyer}
                 className="absolute -top-4 -right-4 sm:-top-5 sm:-right-5 w-11 h-11 rounded-full bg-[#1b4332] hover:bg-black text-[#f5e6c8] hover:text-white border-2 border-[#f5e6c8] flex items-center justify-center text-xl font-bold transition-all hover:scale-110 cursor-pointer shadow-2xl z-30"
                 aria-label="Close Rules Flyer"
                 title="Close Flyer"
@@ -1885,7 +1955,7 @@ function RepositoryOfRemnantsPage() {
               {/* Bottom CTA Button */}
               <button
                 type="button"
-                onClick={() => setShowFlyer(false)}
+                onClick={handleDismissFlyer}
                 className="btn-peek mt-5 px-8 py-3 text-xs tracking-widest uppercase font-mono shadow-xl bg-[#1b4332] hover:bg-white text-white hover:text-black border border-[#2d6a4f] transition-all cursor-pointer"
               >
                 SAMJH GAYA · GOT IT 👍
