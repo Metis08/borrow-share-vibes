@@ -3,6 +3,36 @@ import { useState, useEffect } from "react";
 import { LendPage } from "./lend";
 import MohallaRecommendationsView from "@/components/MohallaRecommendationsView";
 
+const API_BASE = "http://localhost:8085";
+
+function resolveItemImage(item) {
+  const raw = String(item?.imageUrl || item?.image_url || item?.image || "").trim();
+  if (!raw) return "";
+  if (
+    raw.startsWith("data:") ||
+    raw.startsWith("blob:") ||
+    raw.startsWith("http://") ||
+    raw.startsWith("https://")
+  ) {
+    return raw;
+  }
+  if (raw.startsWith("/")) return `${API_BASE}${raw}`;
+  return raw;
+}
+
+function ItemPhoto({ src, alt, className }) {
+  if (!src) {
+    return (
+      <div className={`flex items-center justify-center text-neutral-500 ${className || ""}`}>
+        <span className="text-2xl" aria-hidden>
+          📷
+        </span>
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} className={className} />;
+}
+
 export const Route = createFileRoute("/peek")({
   head: () => ({
     meta: [
@@ -49,7 +79,7 @@ function RepositoryOfRemnantsPage() {
               const owner = item.lenderName || item.username || "Padosi";
               const category = item.category || "Other";
               const area = item.area || "Nearby";
-              const image = item.imageUrl || "/vintage-radio.png";
+              const image = resolveItemImage(item);
               mapped[key] = {
                 id: `LEND-${item.id}`,
                 realId: item.id,
@@ -1385,7 +1415,7 @@ function RepositoryOfRemnantsPage() {
                         <div key={item.id} className="bg-[#191a1c] p-4 rounded-2xl border border-[#2d2e30] flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-800 p-1 flex items-center justify-center shrink-0">
-                              <img src={item.image} alt={item.title} className="max-h-full max-w-full object-contain" />
+                              <ItemPhoto src={item.image} alt={item.title} className="max-h-full max-w-full object-contain" />
                             </div>
                             <div>
                               <h4 className="text-sm font-bold text-white">{item.title}</h4>
@@ -1571,7 +1601,7 @@ function RepositoryOfRemnantsPage() {
 
                         {/* Center Image */}
                         <div className="my-auto py-8 flex items-center justify-center z-10 w-full">
-                          <img
+                          <ItemPhoto
                             src={itemDetails[borrowingItemKey].image}
                             alt={itemDetails[borrowingItemKey].title}
                             className="max-h-80 sm:max-h-96 max-w-full object-contain filter drop-shadow-[0_25px_40px_rgba(0,0,0,0.95)] transform hover:scale-105 transition-transform duration-300"
@@ -1743,7 +1773,7 @@ function RepositoryOfRemnantsPage() {
                   <div className="bg-gradient-to-r from-neutral-800/60 via-neutral-900/50 to-neutral-800/60 border border-neutral-700/50 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-xl">
                     <div className="flex items-center gap-6">
                       <div className="w-24 h-24 bg-neutral-950/80 rounded-xl p-3 border border-neutral-800 flex items-center justify-center shrink-0">
-                        <img
+                        <ItemPhoto
                           src={itemDetails[activeItem].image}
                           alt={itemDetails[activeItem].title}
                           className="max-h-full max-w-full object-contain"
@@ -1878,7 +1908,7 @@ function RepositoryOfRemnantsPage() {
 
                         {/* Item Thumbnail */}
                         <div className="w-full h-36 flex items-center justify-center my-2 p-2">
-                          <img
+                          <ItemPhoto
                             src={item.image}
                             alt={item.title}
                             className="max-h-full max-w-full object-contain transform group-hover:scale-110 transition-transform duration-300"

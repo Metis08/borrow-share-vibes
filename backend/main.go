@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -134,6 +136,57 @@ type LentItem struct {
 	Condition   string `json:"condition"`
 	ImageUrl    string `json:"imageUrl"`
 	CreatedAt   string `json:"createdAt"`
+}
+
+func persistItemImage(dataURL string) (string, error) {
+	dataURL = strings.TrimSpace(dataURL)
+	if dataURL == "" {
+		return "", nil
+	}
+	if strings.HasPrefix(dataURL, "/uploads/") || strings.HasPrefix(dataURL, "http://") || strings.HasPrefix(dataURL, "https://") {
+		return dataURL, nil
+	}
+	if !strings.HasPrefix(dataURL, "data:") {
+		return dataURL, nil
+	}
+
+	comma := strings.Index(dataURL, ",")
+	if comma < 0 {
+		return "", fmt.Errorf("invalid image data")
+	}
+
+	meta := strings.ToLower(dataURL[:comma])
+	payload := dataURL[comma+1:]
+	raw, err := base64.StdEncoding.DecodeString(payload)
+	if err != nil {
+		raw, err = base64.RawStdEncoding.DecodeString(payload)
+		if err != nil {
+			return "", fmt.Errorf("could not decode image")
+		}
+	}
+	if len(raw) == 0 {
+		return "", nil
+	}
+
+	ext := ".jpg"
+	switch {
+	case strings.Contains(meta, "image/png"):
+		ext = ".png"
+	case strings.Contains(meta, "image/webp"):
+		ext = ".webp"
+	case strings.Contains(meta, "image/gif"):
+		ext = ".gif"
+	}
+
+	if err := os.MkdirAll("uploads", 0755); err != nil {
+		return "", err
+	}
+	name := fmt.Sprintf("item-%d%s", time.Now().UnixNano(), ext)
+	path := filepath.Join("uploads", name)
+	if err := os.WriteFile(path, raw, 0644); err != nil {
+		return "", err
+	}
+	return "/uploads/" + name, nil
 }
 
 type UpdateLocationRequest struct {
@@ -951,6 +1004,8 @@ func lendHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 12<<20)
+
 	var req LendRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Bad request", http.StatusBadRequest)
@@ -997,13 +1052,20 @@ func lendHandler(w http.ResponseWriter, r *http.Request) {
 		condition = "Good Working 👍"
 	}
 
+	imageURL, err := persistItemImage(req.ImageUrl)
+	if err != nil {
+		log.Printf("lend image persist error: %v", err)
+		http.Error(w, "Could not save item photo", http.StatusBadRequest)
+		return
+	}
+
 	res, err := db.Exec(
 		`INSERT INTO lent_items (
 			username, item_name, status, category, description,
 			lender_name, area, phone, duration, condition, image_url, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
 		username, req.ItemName, "active", category, req.Description,
-		lenderName, area, req.Phone, duration, condition, req.ImageUrl,
+		lenderName, area, req.Phone, duration, condition, imageURL,
 	)
 	if err != nil {
 		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
@@ -1025,7 +1087,7 @@ func lendHandler(w http.ResponseWriter, r *http.Request) {
 		Phone:       req.Phone,
 		Duration:    duration,
 		Condition:   condition,
-		ImageUrl:    req.ImageUrl,
+		ImageUrl:    imageURL,
 		CreatedAt:   time.Now().Format("2006-01-02 15:04:05"),
 	}
 
@@ -2500,6 +2562,11 @@ func main() {
 	http.HandleFunc("/api/borrow", corsMiddleware(JWTMiddleware(borrowHandler)))
 	http.HandleFunc("/api/lend", corsMiddleware(OptionalJWTMiddleware(lendHandler)))
 	http.HandleFunc("/api/items", corsMiddleware(getItemsHandler))
+
+	uploadFS := http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads")))
+	http.HandleFunc("/uploads/", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		uploadFS.ServeHTTP(w, r)
+	}))
 	http.HandleFunc("/api/setup_profile", corsMiddleware(JWTMiddleware(setupProfileHandler)))
 	http.HandleFunc("/api/user/location", corsMiddleware(JWTMiddleware(updateLocationHandler)))
 	http.HandleFunc("/api/radar/items", corsMiddleware(radarItemsHandler))

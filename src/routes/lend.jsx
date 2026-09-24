@@ -47,18 +47,54 @@ export function LendPage({ onBack }) {
   const [isDragging, setIsDragging] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const processFile = (file) => {
+  const compressImage = (file) =>
+    new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const maxEdge = 1200;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxEdge || height > maxEdge) {
+          const scale = maxEdge / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(objectUrl);
+        resolve(canvas.toDataURL("image/jpeg", 0.84));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target.result);
+        reader.onerror = () => reject(new Error("Could not read photo."));
+        reader.readAsDataURL(file);
+      };
+      img.src = objectUrl;
+    });
+
+  const processFile = async (file) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMessage("Photo size is too large (max 5MB).");
+    if (!file.type?.startsWith("image/")) {
+      setErrorMessage("Please attach a photo of the item (JPG, PNG, or WEBP).");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setImagePreview(event.target.result);
+    if (file.size > 8 * 1024 * 1024) {
+      setErrorMessage("Photo size is too large (max 8MB).");
+      return;
+    }
+    try {
+      const dataUrl = await compressImage(file);
+      setImagePreview(dataUrl);
       setErrorMessage("");
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setErrorMessage("Could not read that photo. Please try another image.");
+    }
   };
 
   const handleImageUpload = (e) => {
@@ -83,6 +119,11 @@ export function LendPage({ onBack }) {
 
     if (!formData.itemTitle.trim()) {
       setErrorMessage("Please enter an item name or title.");
+      return;
+    }
+
+    if (!imagePreview) {
+      setErrorMessage("Please upload a photo of the item so neighbours can see it.");
       return;
     }
 
