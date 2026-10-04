@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import EditProfileModal from "@/components/EditProfileModal";
 import { apiUrl } from "@/lib/api";
 
-export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpenMessages }) {
+export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpenMessages, onItemDeleted }) {
   const [borrowedItems, setBorrowedItems] = useState([]);
   const [lentItems, setLentItems] = useState([]);
   const [openId, setOpenId] = useState(null);
@@ -15,6 +15,50 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpen
     latitude: 0,
     longitude: 0
   });
+
+  // Delete Lent Item state & handler
+  const [deletingItemId, setDeletingItemId] = useState(null);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [deleteItemFeedback, setDeleteItemFeedback] = useState(null);
+
+  const handleDeleteLentItem = async (item) => {
+    if (!item?.id || !currentUser?.token) return;
+    setDeletingItemId(item.id);
+    setDeleteItemFeedback(null);
+    try {
+      const res = await fetch(apiUrl(`/api/items?id=${encodeURIComponent(item.id)}`), {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+      });
+      if (res.ok) {
+        setDeleteItemFeedback({
+          type: "success",
+          message: `"${item.itemName || "Item"}" removed from shelf.`,
+        });
+        setTimeout(() => setDeleteItemFeedback(null), 4000);
+        setLentItems((prev) => prev.filter((x) => x.id !== item.id));
+        fetchProfileData();
+        if (onItemDeleted) onItemDeleted(item.id);
+      } else {
+        const errText = await res.text();
+        setDeleteItemFeedback({
+          type: "error",
+          message: errText || "Failed to delete item from shelf.",
+        });
+      }
+    } catch (err) {
+      console.error("Error deleting item:", err);
+      setDeleteItemFeedback({
+        type: "error",
+        message: "Network error while deleting item.",
+      });
+    } finally {
+      setDeletingItemId(null);
+      setItemToDelete(null);
+    }
+  };
 
   const fetchProfileData = async () => {
     if (!currentUser) return;
@@ -225,16 +269,94 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpen
         <div>
           <h2 className="display-xl">What you are sharing</h2>
           <p className="mt-4 eyebrow text-panel-note">Items you put on shelves</p>
+
+          {/* Feedback banner */}
+          {deleteItemFeedback && (
+            <div
+              className={`mt-4 p-3 rounded-lg text-xs font-mono flex items-center justify-between gap-2 border animate-fadeIn ${
+                deleteItemFeedback.type === "success"
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                  : "bg-red-500/10 border-red-500/30 text-red-300"
+              }`}
+            >
+              <span>{deleteItemFeedback.message}</span>
+              <button
+                type="button"
+                onClick={() => setDeleteItemFeedback(null)}
+                className="text-neutral-400 hover:text-white text-xs cursor-pointer ml-auto"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {lentItems.length === 0 ? (
             <p className="mt-6 font-hand text-xl text-panel-note italic">Your shelf is currently empty.</p>
           ) : (
             <ul className="mt-6 space-y-4">
               {lentItems.map((l) => (
-                <li key={l.id} className="scatter-row">
-                  <span className="font-display text-xl font-bold tracking-wide">{l.itemName}</span>
-                  <span className="font-mono text-[9px] font-light uppercase tracking-[0.2em] text-green-400">
-                    {l.status} on shelf
-                  </span>
+                <li key={l.id} className="scatter-row flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
+                    <span className="font-display text-xl font-bold tracking-wide">{l.itemName}</span>
+                    <span className="font-mono text-[9px] font-light uppercase tracking-[0.2em] text-green-400">
+                      {l.status} on shelf
+                    </span>
+                  </div>
+
+                  {/* Delete Item Option */}
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    {itemToDelete?.id === l.id ? (
+                      <div className="flex items-center gap-1.5 animate-fadeIn">
+                        <span className="text-[10px] font-mono text-red-400 mr-1 hidden xs:inline">Confirm?</span>
+                        <button
+                          type="button"
+                          disabled={deletingItemId === l.id}
+                          onClick={() => handleDeleteLentItem(l)}
+                          className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-mono text-[10px] font-semibold px-2.5 py-1 rounded transition-all cursor-pointer shadow-md flex items-center gap-1"
+                        >
+                          {deletingItemId === l.id ? (
+                            <>
+                              <span className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
+                              <span>Deleting...</span>
+                            </>
+                          ) : (
+                            <span>✓ Yes, Delete</span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingItemId === l.id}
+                          onClick={() => setItemToDelete(null)}
+                          className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-mono text-[10px] px-2 py-1 rounded transition-all cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setItemToDelete(l)}
+                        className="text-neutral-400 hover:text-red-400 hover:bg-red-500/10 border border-neutral-700/80 hover:border-red-500/30 px-2.5 py-1 rounded font-mono text-[10px] transition-all flex items-center gap-1 cursor-pointer group"
+                        title="Delete this lent item"
+                      >
+                        <svg
+                          className="w-3 h-3 text-neutral-400 group-hover:text-red-400 transition-colors"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          <line x1="10" y1="11" x2="10" y2="17" />
+                          <line x1="14" y1="11" x2="14" y2="17" />
+                        </svg>
+                        <span>Delete</span>
+                      </button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

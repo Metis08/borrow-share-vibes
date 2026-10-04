@@ -289,7 +289,7 @@ export function MohallaRadarPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/lend"
-            className="btn-peek-sm cursor-pointer"
+            className="btn-peek-sm px-3 py-1.5 sm:px-5 sm:py-2 tracking-wider sm:tracking-[0.2em] text-[11px] sm:text-[0.7rem] cursor-pointer"
           >
             + LEND SOMETHING
           </Link>

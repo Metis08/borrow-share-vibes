@@ -120,45 +120,47 @@ function RepositoryOfRemnantsPage() {
   const [showFlyer, setShowFlyer] = useState(false);
   const [dbItems, setDbItems] = useState({});
 
-  useEffect(() => {
-    const fetchDbItems = async () => {
-      try {
-        const res = await fetch(apiUrl("/api/items"));
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            const mapped = {};
-            data.forEach((item) => {
-              const key = `lent_${item.id}`;
-              const title = item.itemName || item.item_name || "Mohalla Item";
-              const owner = item.lenderName || item.username || "Padosi";
-              const category = item.category || "Other";
-              const area = item.area || "Nearby";
-              const image = resolveItemImage(item);
-              mapped[key] = {
-                id: `LEND-${item.id}`,
-                realId: item.id,
-                title: title,
-                code: `LEND-${item.id}`,
-                owner: owner,
-                rawUsername: item.username || owner,
-                distance: area,
-                category: category,
-                status: item.status ? (item.status === "active" ? "Available Now" : item.status) : "Available Now",
-                desc: item.description || "Listed in Mohalla Store.",
-                phone: item.phone || "",
-                duration: item.duration || "7 Days",
-                condition: item.condition || "Good Working 👍",
-                image: image,
-              };
-            });
-            setDbItems(mapped);
-          }
+  const fetchDbItems = async () => {
+    try {
+      const res = await fetch(apiUrl("/api/items"));
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const mapped = {};
+          data.forEach((item) => {
+            const key = `lent_${item.id}`;
+            const title = item.itemName || item.item_name || "Mohalla Item";
+            const owner = item.lenderName || item.username || "Padosi";
+            const category = item.category || "Other";
+            const area = item.area || "Nearby";
+            const image = resolveItemImage(item);
+            mapped[key] = {
+              id: `LEND-${item.id}`,
+              realId: item.id,
+              title: title,
+              code: `LEND-${item.id}`,
+              owner: owner,
+              rawUsername: item.username || owner,
+              distance: area,
+              area: area,
+              category: category,
+              status: item.status ? (item.status === "active" ? "Available Now" : item.status) : "Available Now",
+              desc: item.description || "Listed in Mohalla Store.",
+              phone: item.phone || "",
+              duration: item.duration || "7 Days",
+              condition: item.condition || "Good Working 👍",
+              image: image,
+            };
+          });
+          setDbItems(mapped);
         }
-      } catch (err) {
-        console.error("Failed to fetch DB items:", err);
       }
-    };
+    } catch (err) {
+      console.error("Failed to fetch DB items:", err);
+    }
+  };
+
+  useEffect(() => {
     fetchDbItems();
   }, [activeNavTab]);
 
@@ -212,6 +214,30 @@ function RepositoryOfRemnantsPage() {
   const [borrowRequestSent, setBorrowRequestSent] = useState(false);
   const [borrowError, setBorrowError] = useState("");
   const [isSendingBorrowRequest, setIsSendingBorrowRequest] = useState(false);
+  const [isClosingBorrowPanel, setIsClosingBorrowPanel] = useState(false);
+
+  const handleCloseBorrowPanel = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setIsClosingBorrowPanel(true);
+      setTimeout(() => {
+        setBorrowingItemKey(null);
+        setIsClosingBorrowPanel(false);
+        setBorrowRequestSent(false);
+      }, 260);
+    } else {
+      setBorrowingItemKey(null);
+      setBorrowRequestSent(false);
+    }
+  };
+
+  useEffect(() => {
+    if (borrowingItemKey && typeof window !== "undefined" && window.innerWidth < 768) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [borrowingItemKey]);
 
   // Authentication & Profile Modals
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -259,6 +285,49 @@ function RepositoryOfRemnantsPage() {
       console.error("[DEBUG PROFILE] Failed to fetch profile:", err);
     } finally {
       setIsLoadingProfile(false);
+    }
+  };
+
+  // State & handler to allow a lender to delete an item they have lent
+  const [deletingItemId, setDeletingItemId] = useState(null);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [deleteItemFeedback, setDeleteItemFeedback] = useState(null);
+
+  const handleDeleteLentItem = async (item) => {
+    if (!item?.id || !currentUser?.token) return;
+    setDeletingItemId(item.id);
+    setDeleteItemFeedback(null);
+    try {
+      const res = await fetch(apiUrl(`/api/items?id=${encodeURIComponent(item.id)}`), {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+      });
+      if (res.ok) {
+        setDeleteItemFeedback({
+          type: "success",
+          message: `"${item.itemName || "Item"}" removed from your shelf successfully.`,
+        });
+        setTimeout(() => setDeleteItemFeedback(null), 5000);
+        await fetchProfile();
+        await fetchDbItems();
+      } else {
+        const errText = await res.text();
+        setDeleteItemFeedback({
+          type: "error",
+          message: errText || "Failed to delete item from shelf.",
+        });
+      }
+    } catch (err) {
+      console.error("Error deleting item:", err);
+      setDeleteItemFeedback({
+        type: "error",
+        message: "Network error while deleting item.",
+      });
+    } finally {
+      setDeletingItemId(null);
+      setItemToDelete(null);
     }
   };
 
@@ -677,7 +746,7 @@ function RepositoryOfRemnantsPage() {
                   setPanelOpen(true);
                   document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
                 }}
-                className="btn-peek-sm cursor-pointer"
+                className="btn-peek-sm px-3 py-1.5 sm:px-5 sm:py-2 tracking-wider sm:tracking-[0.2em] text-[11px] sm:text-[0.7rem] cursor-pointer"
               >
                 + LEND SOMETHING
               </button>
@@ -825,7 +894,7 @@ function RepositoryOfRemnantsPage() {
         <section className="relative flex-1 w-full max-w-[1350px] mx-auto px-2 sm:px-6 my-2 flex items-center justify-center">
 
           {/* COLLAGE CONTAINER */}
-          <div className="relative w-full max-w-[1200px] h-[520px] sm:h-[580px] flex items-center justify-center">
+          <div className="relative w-full max-w-[1200px] h-[520px] sm:h-[580px] flex items-center justify-center translate-x-6 sm:translate-x-0">
 
             {/* SOFT & SUBTLE BLUISH TEAL GLOW BEHIND THE RADIO SHOWCASE */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[380px] h-[220px] bg-gradient-to-r from-[#00b4d8]/20 via-[#0d9488]/25 to-[#06b6d4]/20 blur-3xl rounded-full pointer-events-none z-10 opacity-50" />
@@ -1107,7 +1176,7 @@ function RepositoryOfRemnantsPage() {
                     onClick={() => {
                       setActiveNavTab("lend");
                     }}
-                    className="btn-peek-sm cursor-pointer"
+                    className="btn-peek-sm px-3 py-1.5 sm:px-5 sm:py-2 tracking-wider sm:tracking-[0.2em] text-[11px] sm:text-[0.7rem] cursor-pointer"
                   >
                     + LEND SOMETHING
                   </button>
@@ -1123,13 +1192,12 @@ function RepositoryOfRemnantsPage() {
               </div>
 
               {/* Mobile Navigation Tab Strip (Visible on screens < 768px) */}
-              <div className="flex md:hidden items-center gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5">
+              <div className="flex md:hidden items-center gap-1.5 overflow-x-auto scrollbar-none py-1 px-0.5 mt-2">
                 {[
                   { id: "explore", label: "Explore" },
                   { id: "stories", label: "Stories" },
                   { id: "recommendations", label: "Recommendations" },
                   { id: "messages", label: "Messages" },
-                  { id: "profile", label: "Profile" },
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -1144,12 +1212,42 @@ function RepositoryOfRemnantsPage() {
                     {tab.label}
                   </button>
                 ))}
+
+                {/* Radar ↗ */}
                 <Link
                   to="/radar"
                   className="text-[11px] font-mono px-3 py-1.5 rounded-full bg-neutral-900/90 text-neutral-400 border border-neutral-800 hover:text-white transition-all cursor-pointer whitespace-nowrap shrink-0"
                 >
                   Radar ↗
                 </Link>
+
+                {/* Profile Icon Button */}
+                <button
+                  type="button"
+                  onClick={() => setActiveNavTab("profile")}
+                  title="Profile"
+                  aria-label="Profile"
+                  className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                    activeNavTab === "profile"
+                      ? "bg-[#09414b] text-teal-100 border border-[#0c5360] shadow-md"
+                      : "bg-neutral-900/90 text-neutral-400 border border-neutral-800 hover:text-white"
+                  }`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-3.5 h-3.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -1715,16 +1813,108 @@ function RepositoryOfRemnantsPage() {
                                 {activeLends.length} Active
                               </span>
                             </div>
+
+                            {/* Feedback Notification for Item Deletion */}
+                            {deleteItemFeedback && (
+                              <div
+                                className={`p-3 rounded-2xl text-xs font-mono flex items-center justify-between gap-2 border animate-fadeIn ${
+                                  deleteItemFeedback.type === "success"
+                                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                                    : "bg-red-500/10 border-red-500/30 text-red-300"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span>{deleteItemFeedback.type === "success" ? "✓" : "⚠️"}</span>
+                                  <span>{deleteItemFeedback.message}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteItemFeedback(null)}
+                                  className="text-neutral-400 hover:text-white text-xs cursor-pointer ml-auto"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            )}
+
                             {activeLends.length > 0 ? (
                               activeLends.map((item) => (
-                                <div key={item.id} className="bg-[#191a1c] p-4 rounded-2xl border border-[#2d2e30] flex items-center justify-between">
-                                  <div>
-                                    <h4 className="text-sm font-bold text-white">{item.itemName}</h4>
-                                    <p className="text-[11px] text-neutral-400 font-mono">{item.category || "Item"}</p>
+                                <div
+                                  key={item.id}
+                                  className="bg-[#191a1c] p-4 rounded-2xl border border-[#2d2e30] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors hover:border-neutral-700/80"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-sm font-bold text-white truncate">{item.itemName}</h4>
+                                      <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono px-2 py-0.5 rounded-full">
+                                        {item.status || "Available"}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
+                                      {item.category || "Item"}
+                                      {item.duration ? ` · ${item.duration}` : ""}
+                                      {item.area ? ` · ${item.area}` : ""}
+                                    </p>
                                   </div>
-                                  <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[11px] font-mono px-2.5 py-1 rounded-full">
-                                    {item.status || "Available"}
-                                  </span>
+
+                                  {/* Delete Item Action (All Screens: Phone, Tablet, Desktop) */}
+                                  <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                    {itemToDelete?.id === item.id ? (
+                                      <div className="flex items-center gap-1.5 animate-fadeIn">
+                                        <span className="text-[11px] font-mono text-red-400 mr-1 hidden xs:inline">
+                                          Delete item?
+                                        </span>
+                                        <button
+                                          type="button"
+                                          disabled={deletingItemId === item.id}
+                                          onClick={() => handleDeleteLentItem(item)}
+                                          className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-mono text-[11px] font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-md flex items-center gap-1"
+                                          title="Confirm Delete"
+                                        >
+                                          {deletingItemId === item.id ? (
+                                            <>
+                                              <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
+                                              <span>Deleting...</span>
+                                            </>
+                                          ) : (
+                                            <span>✓ Yes, Delete</span>
+                                          )}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={deletingItemId === item.id}
+                                          onClick={() => setItemToDelete(null)}
+                                          className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-mono text-[11px] px-2.5 py-1.5 rounded-xl transition-all cursor-pointer"
+                                          title="Cancel"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => setItemToDelete(item)}
+                                        className="text-neutral-400 hover:text-red-400 hover:bg-red-500/10 border border-neutral-700/80 hover:border-red-500/30 px-3 py-1.5 rounded-xl font-mono text-xs transition-all flex items-center gap-1.5 cursor-pointer group"
+                                        title="Delete this lent item"
+                                      >
+                                        <svg
+                                          className="w-3.5 h-3.5 text-neutral-400 group-hover:text-red-400 transition-colors"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        >
+                                          <polyline points="3 6 5 6 21 6" />
+                                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                          <line x1="10" y1="11" x2="10" y2="17" />
+                                          <line x1="14" y1="11" x2="14" y2="17" />
+                                        </svg>
+                                        <span>Delete</span>
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               ))
                             ) : (
@@ -1758,7 +1948,8 @@ function RepositoryOfRemnantsPage() {
                             </h3>
                           </div>
 
-                          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm shrink-0 backdrop-blur-md">
+                          {/* Community Member Badge: hidden on phone view, visible on iPad and desktop */}
+                          <div className="hidden md:flex bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold items-center gap-1.5 shadow-sm shrink-0 backdrop-blur-md">
                             <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                               <polyline points="22 4 12 14.01 9 11.01" />
@@ -1832,35 +2023,55 @@ function RepositoryOfRemnantsPage() {
                 )}
               </div>
             ) : borrowingItemKey && itemDetails[borrowingItemKey] ? (
-              /* BORROWING FORM VIEW INSIDE THE GLASSMORPHED PANEL */
-              <div className="flex flex-col gap-6 py-2 animate-fadeIn">
+              /* BORROWING FORM VIEW (SLIDES UP FROM BOTTOM ON PHONE VIEW) */
+              <div
+                className={`flex flex-col gap-6 py-2 ${
+                  isClosingBorrowPanel ? "animate-borrow-slide-down" : "animate-borrow-slide-up"
+                } md:animate-fadeIn fixed inset-0 z-50 bg-[#141418] overflow-y-auto p-4 sm:p-6 pb-28 md:static md:inset-auto md:z-auto md:bg-transparent md:p-0 md:pb-0 md:overflow-visible`}
+              >
+                {/* Mobile Handle Pill */}
+                <div className="w-10 h-1 rounded-full bg-white/20 mx-auto -mt-1 mb-1 md:hidden shrink-0" />
+
                 {/* Top Header Bar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800/80 pb-5">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                  <div className="flex items-center justify-between w-full sm:w-auto">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                      {/* Back button: strictly hidden on phone view, preserved for iPad and desktop view */}
+                      <div className="hidden md:inline-flex">
+                        <button
+                          type="button"
+                          onClick={handleCloseBorrowPanel}
+                          className="btn-peek-sm cursor-pointer"
+                        >
+                          ← BACK TO STORE ITEMS
+                        </button>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="font-mono text-[11px] text-neutral-400 uppercase tracking-widest">
+                            DIRECT MOHALLA BORROWING
+                          </span>
+                        </div>
+                        <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#f5e6c8]">
+                          <span className="md:hidden">Borrow Item</span>
+                          <span className="hidden md:inline">Borrowing Request Form</span>
+                        </h2>
+                      </div>
+                    </div>
+
+                    {/* Mobile Close X button */}
                     <button
                       type="button"
-                      onClick={() => {
-                        setBorrowingItemKey(null);
-                        setBorrowRequestSent(false);
-                      }}
-                      className="btn-peek-sm"
+                      onClick={handleCloseBorrowPanel}
+                      className="md:hidden w-8 h-8 rounded-full bg-neutral-800/80 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center text-sm font-semibold shrink-0 cursor-pointer"
+                      title="Close"
                     >
-                      ← BACK TO STORE ITEMS
+                      ✕
                     </button>
-                    <div>
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="font-mono text-[11px] text-neutral-400 uppercase tracking-widest">
-                          DIRECT MOHALLA BORROWING
-                        </span>
-                      </div>
-                      <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#f5e6c8]">
-                        Borrowing Request Form
-                      </h2>
-                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-full w-fit">
+                  <div className="hidden md:flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-full w-fit">
                     <span>✓ 100% Free Neighborhood Sharing</span>
                   </div>
                 </div>
@@ -1889,10 +2100,7 @@ function RepositoryOfRemnantsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          setBorrowingItemKey(null);
-                          setBorrowRequestSent(false);
-                        }}
+                        onClick={handleCloseBorrowPanel}
                         className="btn-peek-sm"
                       >
                         KEEP BROWSING
@@ -1905,11 +2113,11 @@ function RepositoryOfRemnantsPage() {
                     
                     {/* LEFT COLUMN: ITEM IMAGE SPOTLIGHT */}
                     <div className="lg:col-span-5 flex flex-col gap-4 h-full">
-                      <div className="bg-neutral-900/90 border border-neutral-800 rounded-[2.5rem] p-8 flex flex-col justify-between items-center relative overflow-hidden backdrop-blur-2xl shadow-2xl h-full min-h-[560px] lg:min-h-[620px]">
+                      <div className="bg-neutral-900/90 border border-neutral-800 rounded-[2.5rem] p-6 sm:p-8 flex flex-col justify-between items-center relative overflow-hidden backdrop-blur-2xl shadow-2xl h-full min-h-[300px] md:min-h-[560px] lg:min-h-[620px]">
                         
                         {/* Top Bar inside Left Card */}
                         <div className="w-full flex items-center justify-between z-10">
-                          <span className="font-mono text-xs text-teal-200 uppercase tracking-widest bg-[#09414b]/30 px-3 py-1 rounded-full border border-[#0c5360]/50">
+                          <span className="hidden md:inline-block font-mono text-xs text-teal-200 uppercase tracking-widest bg-[#09414b]/30 px-3 py-1 rounded-full border border-[#0c5360]/50">
                             {itemDetails[borrowingItemKey].code}
                           </span>
                           <span className="text-xs font-mono text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
@@ -1948,7 +2156,7 @@ function RepositoryOfRemnantsPage() {
                           <span className="text-[11px] font-mono text-neutral-400 uppercase tracking-wider bg-neutral-800 px-3 py-1 rounded-full">
                             {itemDetails[borrowingItemKey].category}
                           </span>
-                          <span className="text-[11px] font-mono text-teal-200 bg-[#09414b]/30 px-3 py-1 rounded-full border border-[#0c5360]/50">
+                          <span className="hidden md:inline-block text-[11px] font-mono text-teal-200 bg-[#09414b]/30 px-3 py-1 rounded-full border border-[#0c5360]/50">
                             Lender: {itemDetails[borrowingItemKey].owner}
                           </span>
                         </div>
@@ -1961,7 +2169,36 @@ function RepositoryOfRemnantsPage() {
                           {itemDetails[borrowingItemKey].desc}
                         </p>
 
-                        <div className="flex flex-wrap gap-2 pt-2 border-t border-neutral-800/80">
+                        {/* Phone view: Lender & Lending Details (No pills, clean info) */}
+                        <div className="md:hidden pt-3 border-t border-neutral-800/80 flex flex-col gap-2 font-mono text-xs">
+                          <div className="grid grid-cols-1 gap-2 text-[12px]">
+                            <div className="flex items-center gap-2">
+                              <span className="text-neutral-500 uppercase tracking-wider text-[10px]">Address:</span>
+                              <span className="text-neutral-200 font-medium">
+                                {itemDetails[borrowingItemKey].area || itemDetails[borrowingItemKey].distance || "Nearby Mohalla"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-neutral-500 uppercase tracking-wider text-[10px]">Lend Duration:</span>
+                              <span className="text-neutral-200 font-medium">
+                                {itemDetails[borrowingItemKey].duration || "7 Days"}
+                              </span>
+                            </div>
+
+                            {itemDetails[borrowingItemKey].condition && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-neutral-500 uppercase tracking-wider text-[10px]">Condition:</span>
+                                <span className="text-neutral-200 font-medium">
+                                  {itemDetails[borrowingItemKey].condition}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Desktop / iPad view: Preserved original badges */}
+                        <div className="hidden md:flex flex-wrap gap-2 pt-2 border-t border-neutral-800/80">
                           <span className="text-[10px] font-mono text-neutral-400 bg-neutral-950 px-3 py-1 rounded-full border border-neutral-800">
                             🤝 Verified Neighbor
                           </span>
@@ -1975,7 +2212,7 @@ function RepositoryOfRemnantsPage() {
                       </div>
 
                       {/* BOTTOM SECTION: INTERACTIVE DATE PICKER CARD */}
-                      <div className="relative group">
+                      <div className="hidden md:block relative group">
                         {/* MAIN CARD CONTAINER WITH NOTCHED CUTOUT AT TOP-RIGHT */}
                         <div className="bg-[#121319] border border-neutral-800 rounded-[2.5rem] p-6 sm:p-7 backdrop-blur-2xl flex flex-col gap-5 relative overflow-hidden shadow-2xl">
                           
@@ -2100,7 +2337,7 @@ function RepositoryOfRemnantsPage() {
               <>
                 {/* Selected Item Spotlight Banner */}
                 {activeItem && itemDetails[activeItem] && (
-                  <div className="bg-gradient-to-r from-neutral-800/60 via-neutral-900/50 to-neutral-800/60 border border-neutral-700/50 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-xl">
+                  <div className="hidden md:flex bg-gradient-to-r from-neutral-800/60 via-neutral-900/50 to-neutral-800/60 border border-neutral-700/50 rounded-2xl p-6 flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-xl">
                     <div className="flex items-center gap-6">
                       <div className="w-24 h-24 bg-neutral-950/80 rounded-xl p-3 border border-neutral-800 flex items-center justify-center shrink-0">
                         <ItemPhoto

@@ -631,5 +631,41 @@ html, body {
   scrollbar-width: none;
 }
 
+/* --- Mobile Borrow Panel Slide Up/Down Animation (Phone view only) --- */
+@keyframes mobileBorrowSlideUp {
+  0% {
+    transform: translateY(100%);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
 
+@keyframes mobileBorrowSlideDown {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0.7;
+  }
+}
 
+.animate-borrow-slide-up {
+  animation: mobileBorrowSlideUp 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-borrow-slide-down {
+  animation: mobileBorrowSlideDown 0.26s cubic-bezier(0.32, 0, 0.67, 0) forwards;
+}
+
+/* Ensure button hiding utilities take absolute precedence over .btn-peek-sm */
+@media (max-width: 767px) {
+  .btn-peek-sm.hidden,
+  .btn-peek-sm.phone-hidden {
+    display: none !important;
+  }
+}

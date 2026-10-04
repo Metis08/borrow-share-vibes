@@ -367,9 +367,24 @@ function Index() {
             the mohalla is awake
           </span>
 
-          <p className="absolute inset-x-0 bottom-10 sm:bottom-20 text-center font-mono text-[10px] sm:text-[13px] md:text-[16px] font-light uppercase leading-relaxed tracking-[0.22em] sm:tracking-[0.42em] text-hero-tag px-4 max-w-md sm:max-w-none mx-auto">
+          <p className="absolute inset-x-0 bottom-12 sm:bottom-20 text-center font-mono text-[10px] sm:text-[13px] md:text-[16px] font-light uppercase leading-relaxed tracking-[0.22em] sm:tracking-[0.42em] text-hero-tag px-4 max-w-md sm:max-w-none mx-auto">
             Borrow it. Return it. Keep the mohalla moving.
           </p>
+
+          {/* Subtle mobile-only glassmorphic peek sheet */}
+          <div
+            onClick={() => {
+              document.getElementById("panel")?.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="md:hidden absolute inset-x-0 bottom-0 z-30 h-7 glass-sheet rounded-t-[36px] border-t border-white/20 cursor-pointer shadow-[0_-10px_25px_rgba(0,0,0,0.6)]"
+            style={{
+              opacity: Math.max(0, 1 - p * 3),
+              pointerEvents: p > 0.3 ? "none" : "auto",
+            }}
+            aria-hidden="true"
+          >
+            <div className="grain" aria-hidden="true" />
+          </div>
         </div>
 
         <div className="h-[70vh]" aria-hidden="true" />

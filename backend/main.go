@@ -1980,6 +1980,184 @@ func getItemsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(items)
 }
 
+func deleteItemHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	uCtx, ok := getUserFromContext(r)
+	if !ok || uCtx == nil || uCtx.Username == "" {
+		http.Error(w, "Unauthorized: Please log in to delete an item", http.StatusUnauthorized)
+		return
+	}
+
+	// Read item ID from query parameter or JSON body
+	id := strings.TrimSpace(r.URL.Query().Get("id"))
+	if id == "" {
+		var req struct {
+			ID string `json:"id"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		id = strings.TrimSpace(req.ID)
+	}
+
+	id = strings.TrimPrefix(id, "LEND-")
+	id = strings.TrimPrefix(id, "lent_")
+	id = strings.TrimSpace(id)
+
+	if id == "" {
+		http.Error(w, "Item ID is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+
+	if IsFirebaseEnabled() {
+		var itemDocRef *firestore.DocumentRef
+		var itemUsername string
+		var itemImageURL string
+
+		docSnap, err := GetFirestore().Collection("items").Doc(id).Get(ctx)
+		if err == nil && docSnap.Exists() {
+			itemDocRef = docSnap.Ref
+			var fItem FirestoreItem
+			if docSnap.DataTo(&fItem) == nil {
+				itemUsername = fItem.Username
+				itemImageURL = fItem.ImageUrl
+			}
+		}
+
+		if itemDocRef == nil {
+			iter := GetFirestore().Collection("items").Where("id", "==", id).Limit(1).Documents(ctx)
+			doc, err := iter.Next()
+			iter.Stop()
+			if err == nil && doc.Exists() {
+				itemDocRef = doc.Ref
+				var fItem FirestoreItem
+				if doc.DataTo(&fItem) == nil {
+					itemUsername = fItem.Username
+					itemImageURL = fItem.ImageUrl
+				}
+			}
+		}
+
+		// Also check Firestore collection "lent_items"
+		var lentDocRef *firestore.DocumentRef
+		lentSnap, lErr := GetFirestore().Collection("lent_items").Doc(id).Get(ctx)
+		if lErr == nil && lentSnap.Exists() {
+			lentDocRef = lentSnap.Ref
+			var fLent FirestoreLentItem
+			if lentSnap.DataTo(&fLent) == nil && itemUsername == "" {
+				itemUsername = fLent.Username
+			}
+		}
+		if lentDocRef == nil {
+			if intId, parseErr := strconv.Atoi(id); parseErr == nil {
+				iter := GetFirestore().Collection("lent_items").Where("id", "==", intId).Limit(1).Documents(ctx)
+				doc, err := iter.Next()
+				iter.Stop()
+				if err == nil && doc.Exists() {
+					lentDocRef = doc.Ref
+					var fLent FirestoreLentItem
+					if doc.DataTo(&fLent) == nil && itemUsername == "" {
+						itemUsername = fLent.Username
+					}
+				}
+			}
+		}
+
+		if itemDocRef == nil && lentDocRef == nil {
+			// Check legacy SQLite before returning not found
+			var sqlUsername string
+			sqlErr := db.QueryRow("SELECT username FROM lent_items WHERE id = ? OR item_name = ?", id, id).Scan(&sqlUsername)
+			if sqlErr != nil {
+				http.Error(w, "Item not found", http.StatusNotFound)
+				return
+			}
+			if !strings.EqualFold(sqlUsername, uCtx.Username) {
+				http.Error(w, "Forbidden: Cannot delete item lent by another user", http.StatusForbidden)
+				return
+			}
+			_, _ = db.Exec("DELETE FROM lent_items WHERE (id = ? OR item_name = ?) AND username = ?", id, id, uCtx.Username)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"message": "Item deleted successfully",
+				"id":      id,
+			})
+			return
+		}
+
+		// Ownership check
+		if itemUsername != "" && !strings.EqualFold(itemUsername, uCtx.Username) {
+			http.Error(w, "Forbidden: Cannot delete item lent by another user", http.StatusForbidden)
+			return
+		}
+
+		if itemDocRef != nil {
+			if _, err := itemDocRef.Delete(ctx); err != nil {
+				log.Printf("[Firestore] Error deleting item doc %s: %v", id, err)
+			}
+		}
+
+		if lentDocRef != nil {
+			if _, err := lentDocRef.Delete(ctx); err != nil {
+				log.Printf("[Firestore] Error deleting lent_item doc %s: %v", id, err)
+			}
+		}
+
+		if itemImageURL != "" {
+			_ = GetStorageProvider().Delete(ctx, itemImageURL)
+		}
+
+		// Clean up pending borrow requests for this deleted item
+		brIter := GetFirestore().Collection("borrow_requests").Where("itemId", "==", id).Documents(ctx)
+		for {
+			brDoc, err := brIter.Next()
+			if err != nil {
+				break
+			}
+			_, _ = brDoc.Ref.Delete(ctx)
+		}
+		brIter.Stop()
+
+		// Also clean up SQLite in case of dual-writes
+		_, _ = db.Exec("DELETE FROM lent_items WHERE (id = ? OR item_name = ?) AND username = ?", id, id, uCtx.Username)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Item deleted successfully",
+			"id":      id,
+		})
+		return
+	}
+
+	// SQLite only mode
+	var sqlUsername string
+	err := db.QueryRow("SELECT username FROM lent_items WHERE id = ? OR item_name = ?", id, id).Scan(&sqlUsername)
+	if err != nil {
+		http.Error(w, "Item not found", http.StatusNotFound)
+		return
+	}
+
+	if !strings.EqualFold(sqlUsername, uCtx.Username) {
+		http.Error(w, "Forbidden: Cannot delete item lent by another user", http.StatusForbidden)
+		return
+	}
+
+	_, err = db.Exec("DELETE FROM lent_items WHERE (id = ? OR item_name = ?) AND username = ?", id, id, uCtx.Username)
+	if err != nil {
+		http.Error(w, "Failed to delete item: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Item deleted successfully",
+		"id":      id,
+	})
+}
+
 func updateLocationHandler(w http.ResponseWriter, r *http.Request) {
 	uCtx, ok := getUserFromContext(r)
 	if !ok || uCtx.Username == "" {
@@ -4950,7 +5128,16 @@ func main() {
 	http.HandleFunc("/api/profile/public", corsMiddleware(publicProfileHandler))
 	http.HandleFunc("/api/borrow", corsMiddleware(JWTMiddleware(borrowHandler)))
 	http.HandleFunc("/api/lend", corsMiddleware(OptionalJWTMiddleware(lendHandler)))
-	http.HandleFunc("/api/items", corsMiddleware(getItemsHandler))
+	http.HandleFunc("/api/items", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			getItemsHandler(w, r)
+		} else if r.Method == http.MethodDelete {
+			JWTMiddleware(deleteItemHandler)(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))
+	http.HandleFunc("/api/items/delete", corsMiddleware(JWTMiddleware(deleteItemHandler)))
 
 	uploadFS := http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads")))
 	http.HandleFunc("/uploads/", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
