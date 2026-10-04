@@ -11,6 +11,7 @@ import {
   didSessionExpireOnStartup,
   resetSessionExpiredOnStartupFlag,
 } from "@/lib/auth";
+import { apiUrl } from "@/lib/api";
 
 export const Route = createFileRoute("/recommendations")({
   head: () => ({
@@ -132,7 +133,7 @@ export function RecommendationsPage() {
       if (selectedCategory !== "All") params.append("category", selectedCategory);
       if (searchQuery.trim()) params.append("search", searchQuery.trim());
 
-      const res = await fetch(`http://localhost:8085/api/recommendations?${params.toString()}`);
+      const res = await fetch(apiUrl(`/api/recommendations?${params.toString()}`));
       if (res.ok) {
         const data = await res.json();
         setPosts(data || []);
@@ -156,7 +157,7 @@ export function RecommendationsPage() {
       if (currentUser?.token) {
         headers["Authorization"] = `Bearer ${currentUser.token}`;
       }
-      const res = await fetch(`http://localhost:8085/api/recommendations/detail?id=${postId}`, { headers });
+      const res = await fetch(apiUrl(`/api/recommendations/detail?id=${postId}`), { headers });
       if (res.ok) {
         const data = await res.json();
         setActivePost(data);
@@ -182,7 +183,7 @@ export function RecommendationsPage() {
 
     setIsSubmittingPost(true);
     try {
-      const res = await fetch("http://localhost:8085/api/recommendations", {
+      const res = await fetch(apiUrl("/api/recommendations"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -232,7 +233,7 @@ export function RecommendationsPage() {
 
     setIsSubmittingReply(true);
     try {
-      const res = await fetch("http://localhost:8085/api/recommendations/reply", {
+      const res = await fetch(apiUrl("/api/recommendations/reply"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -282,7 +283,7 @@ export function RecommendationsPage() {
     if (!requireAuth()) return;
 
     try {
-      const res = await fetch("http://localhost:8085/api/recommendations/reply/helpful", {
+      const res = await fetch(apiUrl("/api/recommendations/reply/helpful"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -309,7 +310,7 @@ export function RecommendationsPage() {
     if (!requireAuth()) return;
 
     try {
-      const res = await fetch("http://localhost:8085/api/recommendations/endorse", {
+      const res = await fetch(apiUrl("/api/recommendations/endorse"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -339,7 +340,7 @@ export function RecommendationsPage() {
     if (!currentUser?.token) return;
 
     try {
-      const res = await fetch(`http://localhost:8085/api/recommendations?id=${postId}`, {
+      const res = await fetch(apiUrl(`/api/recommendations?id=${postId}`), {
         method: "DELETE",
         headers: { Authorization: `Bearer ${currentUser.token}` },
       });

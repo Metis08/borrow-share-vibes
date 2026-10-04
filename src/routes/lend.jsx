@@ -11,6 +11,7 @@ import {
   didSessionExpireOnStartup,
   resetSessionExpiredOnStartupFlag,
 } from "@/lib/auth";
+import { apiUrl } from "@/lib/api";
 
 export const Route = createFileRoute("/lend")({
   head: () => ({
@@ -185,7 +186,7 @@ export function LendPage({ onBack }) {
         "Authorization": `Bearer ${currentUser.token}`,
       };
 
-      const res = await fetch("http://localhost:8085/api/lend", {
+      const res = await fetch(apiUrl("/api/lend"), {
         method: "POST",
         headers,
         body: JSON.stringify({

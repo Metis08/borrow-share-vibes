@@ -1,21 +1,11 @@
 import React, { useState, useEffect } from "react";
 import AuthModal from "@/components/AuthModal";
 import { getStoredUser, clearSession, isTokenValid } from "@/lib/auth";
+import { apiUrl } from "@/lib/api";
 
 const resolveMomentPhoto = (url) => {
   if (!url) return "";
-  if (
-    url.startsWith("data:") ||
-    url.startsWith("blob:") ||
-    url.startsWith("http://") ||
-    url.startsWith("https://")
-  ) {
-    return url;
-  }
-  if (url.startsWith("/")) {
-    return `http://localhost:8085${url}`;
-  }
-  return url;
+  return apiUrl(url);
 };
 
 export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
@@ -69,7 +59,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
   const fetchMoments = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("http://localhost:8085/api/moments");
+      const res = await fetch(apiUrl("/api/moments"));
       if (res.ok) {
         const data = await res.json();
         setMoments(data.moments || []);
@@ -86,7 +76,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
   const fetchUserBorrowRequests = async () => {
     if (!currentUser?.token) return;
     try {
-      const res = await fetch("http://localhost:8085/api/borrow-requests", {
+      const res = await fetch(apiUrl("/api/borrow-requests"), {
         headers: { Authorization: `Bearer ${currentUser.token}` },
       });
       if (res.ok) {
@@ -178,7 +168,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
         area: areaName.trim(),
       };
 
-      const res = await fetch("http://localhost:8085/api/moments", {
+      const res = await fetch(apiUrl("/api/moments"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

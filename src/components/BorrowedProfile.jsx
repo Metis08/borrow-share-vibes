@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import EditProfileModal from "@/components/EditProfileModal";
+import { apiUrl } from "@/lib/api";
 
 export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpenMessages }) {
   const [borrowedItems, setBorrowedItems] = useState([]);
@@ -18,7 +19,7 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpen
   const fetchProfileData = async () => {
     if (!currentUser) return;
     try {
-      const res = await fetch("http://localhost:8085/api/profile", {
+      const res = await fetch(apiUrl("/api/profile"), {
         headers: {
           "Authorization": `Bearer ${currentUser.token}`,
         },
@@ -90,7 +91,7 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpen
 
   const saveRadarSharing = async (enabled, lat, lng) => {
     try {
-      const res = await fetch("http://localhost:8085/api/user/location", {
+      const res = await fetch(apiUrl("/api/user/location"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

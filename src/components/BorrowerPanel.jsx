@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { clearSession } from "@/lib/auth";
+import { apiUrl } from "@/lib/api";
 
 export default function BorrowerPanel({ currentUser, onAuthRequired, onBorrowSuccess }) {
   const [q, setQ] = useState("");
   const [items, setItems] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:8085/api/items")
+    fetch(apiUrl("/api/items"))
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) {
@@ -42,7 +43,7 @@ export default function BorrowerPanel({ currentUser, onAuthRequired, onBorrowSuc
       return;
     }
     try {
-      const res = await fetch("http://localhost:8085/api/borrow-requests", {
+      const res = await fetch(apiUrl("/api/borrow-requests"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

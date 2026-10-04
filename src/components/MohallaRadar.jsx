@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import { formatKm } from "@/lib/lenders";
+import { apiUrl } from "@/lib/api";
 
 const CATEGORIES = ["All", "Electronics", "Tools", "Books", "Home", "Outdoor", "Events", "Other"];
 
@@ -144,19 +145,7 @@ const create3dBuildingCanvasLayer = (L, centerLat, centerLng) => {
 const resolveRadarImage = (item) => {
   const raw = String(item?.imageUrl || item?.image_url || item?.image || item?.photo || "").trim();
   if (!raw) return "";
-  if (
-    raw.startsWith("data:") ||
-    raw.startsWith("blob:") ||
-    raw.startsWith("http://") ||
-    raw.startsWith("https://")
-  ) {
-    return raw;
-  }
-  if (raw.startsWith("/")) {
-    const apiBase = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) || "http://localhost:8085";
-    return `${apiBase}${raw}`;
-  }
-  return raw;
+  return apiUrl(raw);
 };
 
 export default function MohallaRadar({ 
@@ -268,7 +257,7 @@ export default function MohallaRadar({
     setLoading(true);
     setErrorMsg("");
     try {
-      const url = `http://localhost:8085/api/radar/items?lat=${centerLat}&lng=${centerLng}&radius=${radiusKm}&category=${category}&q=${searchQuery}&sort=${sortOrder}`;
+      const url = apiUrl(`/api/radar/items?lat=${centerLat}&lng=${centerLng}&radius=${radiusKm}&category=${category}&q=${searchQuery}&sort=${sortOrder}`);
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -301,7 +290,7 @@ export default function MohallaRadar({
   const updateSharingSettings = async (enabled, lat, lng) => {
     if (!currentUser) return;
     try {
-      const res = await fetch("http://localhost:8085/api/user/location", {
+      const res = await fetch(apiUrl("/api/user/location"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -363,7 +352,7 @@ export default function MohallaRadar({
       return;
     }
     try {
-      const res = await fetch("http://localhost:8085/api/borrow-requests", {
+      const res = await fetch(apiUrl("/api/borrow-requests"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -17,6 +17,7 @@ import {
   didSessionExpireOnStartup,
   resetSessionExpiredOnStartupFlag,
 } from "@/lib/auth";
+import { apiUrl } from "@/lib/api";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -122,7 +123,7 @@ function Index() {
         return;
       }
       try {
-        const res = await fetch("http://localhost:8085/api/profile", {
+        const res = await fetch(apiUrl("/api/profile"), {
           headers: {
             "Authorization": `Bearer ${currentUser.token}`,
           },
@@ -146,7 +147,7 @@ function Index() {
   const saveUserCoordinates = async (lat, lng) => {
     if (!currentUser) return;
     try {
-      const res = await fetch("http://localhost:8085/api/user/location", {
+      const res = await fetch(apiUrl("/api/user/location"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -237,7 +238,7 @@ function Index() {
     }
     const endpoint = authMode === "login" ? "login" : "register";
     try {
-      const res = await fetch(`http://localhost:8085/api/${endpoint}`, {
+      const res = await fetch(apiUrl(`/api/${endpoint}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: u, password: p }),
@@ -294,7 +295,7 @@ function Index() {
       if (registeredToken) {
         headers["Authorization"] = `Bearer ${registeredToken}`;
       }
-      const res = await fetch("http://localhost:8085/api/setup_profile", {
+      const res = await fetch(apiUrl("/api/setup_profile"), {
         method: "POST",
         headers,
         body: JSON.stringify({

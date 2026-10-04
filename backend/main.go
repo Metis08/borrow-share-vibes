@@ -632,7 +632,6 @@ func persistItemImage(dataURL string) (string, error) {
 	return GetStorageProvider().SaveDataURL(context.Background(), dataURL, "items", "general", "item")
 }
 
-
 type UpdateLocationRequest struct {
 	LocationSharingEnabled bool    `json:"locationSharingEnabled"`
 	Enabled                *bool   `json:"enabled,omitempty"`
@@ -806,8 +805,6 @@ type MohallaMomentsResponse struct {
 	Moments            []MohallaMoment `json:"moments"`
 	TotalBorrowedCount int             `json:"totalBorrowedCount"`
 }
-
-
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -1047,7 +1044,6 @@ func initDB() {
 	db.Exec("ALTER TABLE lent_items ADD COLUMN image_url TEXT DEFAULT ''")
 	db.Exec("ALTER TABLE lent_items ADD COLUMN created_at DATETIME DEFAULT '2026-08-13 12:00:00'")
 }
-
 
 func generateToken(userID int, username string) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
@@ -3611,7 +3607,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 func getRecommendationsHandler(w http.ResponseWriter, r *http.Request) {
 	category := strings.TrimSpace(r.URL.Query().Get("category"))
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
@@ -4880,12 +4875,18 @@ func main() {
 		}
 	}
 
+	defaultProductionOrigins := []string{
+		"https://mohalla-frontend.onrender.com",
+	}
+
 	defaultDevOrigins := []string{
 		"http://localhost:5173",
 		"http://localhost:8080",
+		"http://localhost:8081",
 		"http://localhost:3000",
 		"http://127.0.0.1:5173",
 		"http://127.0.0.1:8080",
+		"http://127.0.0.1:8081",
 		"http://127.0.0.1:3000",
 	}
 
@@ -4898,11 +4899,19 @@ func main() {
 				return true, origin
 			}
 		}
+		for _, po := range defaultProductionOrigins {
+			if strings.EqualFold(po, origin) {
+				return true, origin
+			}
+		}
 		if !isProductionMode() {
 			for _, ddo := range defaultDevOrigins {
 				if strings.EqualFold(ddo, origin) {
 					return true, origin
 				}
+			}
+			if strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") {
+				return true, origin
 			}
 		}
 		return false, ""
@@ -4919,10 +4928,15 @@ func main() {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 			}
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
+			w.Header().Set("Access-Control-Max-Age", "86400")
 			w.Header().Set("Vary", "Origin")
 
 			if r.Method == http.MethodOptions {
+				if !allowed {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
 				w.WriteHeader(http.StatusOK)
 				return
 			}
@@ -5037,4 +5051,3 @@ func main() {
 	log.Printf("Backend server running on http://localhost:%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
-

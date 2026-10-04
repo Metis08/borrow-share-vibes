@@ -15,22 +15,12 @@ import {
   didSessionExpireOnStartup,
   resetSessionExpiredOnStartupFlag,
 } from "@/lib/auth";
-
-const API_BASE = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) || "http://localhost:8085";
+import { apiUrl, wsUrl } from "@/lib/api";
 
 function resolveItemImage(item) {
   const raw = String(item?.imageUrl || item?.image_url || item?.image || "").trim();
   if (!raw) return "";
-  if (
-    raw.startsWith("data:") ||
-    raw.startsWith("blob:") ||
-    raw.startsWith("http://") ||
-    raw.startsWith("https://")
-  ) {
-    return raw;
-  }
-  if (raw.startsWith("/")) return `${API_BASE}${raw}`;
-  return raw;
+  return apiUrl(raw);
 }
 
 function ItemPhoto({ src, alt, className }) {
@@ -133,7 +123,7 @@ function RepositoryOfRemnantsPage() {
   useEffect(() => {
     const fetchDbItems = async () => {
       try {
-        const res = await fetch("http://localhost:8085/api/items");
+        const res = await fetch(apiUrl("/api/items"));
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
@@ -251,7 +241,7 @@ function RepositoryOfRemnantsPage() {
     setIsLoadingProfile(true);
     try {
       console.log("[DEBUG PROFILE] Calling /api/profile with token prefix:", currentUser.token.slice(0, 15));
-      const res = await fetch("http://localhost:8085/api/profile", {
+      const res = await fetch(apiUrl("/api/profile"), {
         headers: {
           Authorization: `Bearer ${currentUser.token}`,
         },
@@ -279,7 +269,7 @@ function RepositoryOfRemnantsPage() {
     }
     setIsLoadingConversations(true);
     try {
-      const res = await fetch("http://localhost:8085/api/conversations", {
+      const res = await fetch(apiUrl("/api/conversations"), {
         headers: {
           Authorization: `Bearer ${currentUser.token}`,
         },
@@ -299,7 +289,7 @@ function RepositoryOfRemnantsPage() {
     if (!currentUser?.token || !convId) return;
     setIsLoadingMessages(true);
     try {
-      const res = await fetch(`http://localhost:8085/api/conversations/messages?conversationId=${convId}`, {
+      const res = await fetch(apiUrl(`/api/conversations/messages?conversationId=${convId}`), {
         headers: {
           Authorization: `Bearer ${currentUser.token}`,
         },
@@ -327,7 +317,7 @@ function RepositoryOfRemnantsPage() {
     }
     setIsLoadingBorrowRequests(true);
     try {
-      const res = await fetch("http://localhost:8085/api/borrow-requests", {
+      const res = await fetch(apiUrl("/api/borrow-requests"), {
         headers: {
           Authorization: `Bearer ${currentUser.token}`,
         },
@@ -347,7 +337,7 @@ function RepositoryOfRemnantsPage() {
     if (!currentUser?.token || !requestId) return;
     setIsProcessingRequestId(requestId);
     try {
-      const res = await fetch("http://localhost:8085/api/borrow-requests/accept", {
+      const res = await fetch(apiUrl("/api/borrow-requests/accept"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -373,7 +363,7 @@ function RepositoryOfRemnantsPage() {
     if (!currentUser?.token || !requestId) return;
     setIsProcessingRequestId(requestId);
     try {
-      const res = await fetch("http://localhost:8085/api/borrow-requests/reject", {
+      const res = await fetch(apiUrl("/api/borrow-requests/reject"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -414,8 +404,8 @@ function RepositoryOfRemnantsPage() {
 
     let ws = null;
     try {
-      const wsUrl = `ws://localhost:8085/api/conversations/ws?token=${encodeURIComponent(currentUser.token)}&conversationId=${activeChatId}`;
-      ws = new WebSocket(wsUrl);
+      const socketUrl = wsUrl(`/api/conversations/ws?token=${encodeURIComponent(currentUser.token)}&conversationId=${activeChatId}`);
+      ws = new WebSocket(socketUrl);
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
@@ -448,7 +438,7 @@ function RepositoryOfRemnantsPage() {
     setChatError("");
 
     try {
-      const res = await fetch("http://localhost:8085/api/conversations/messages", {
+      const res = await fetch(apiUrl("/api/conversations/messages"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -493,7 +483,7 @@ function RepositoryOfRemnantsPage() {
     setBorrowError("");
 
     try {
-      const res = await fetch("http://localhost:8085/api/borrow-requests", {
+      const res = await fetch(apiUrl("/api/borrow-requests"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

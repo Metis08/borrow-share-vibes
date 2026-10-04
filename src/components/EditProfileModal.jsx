@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { apiUrl } from "@/lib/api";
 
 export default function EditProfileModal({
   isOpen,
@@ -44,7 +45,7 @@ export default function EditProfileModal({
       localStorage.setItem("mohalla_profile", JSON.stringify(updatedProfile));
 
       if (currentUser?.token) {
-        const res = await fetch("http://localhost:8085/api/setup_profile", {
+        const res = await fetch(apiUrl("/api/setup_profile"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

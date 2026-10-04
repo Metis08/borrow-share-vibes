@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { setStoredUser } from "@/lib/auth";
+import { apiUrl } from "@/lib/api";
 
 export default function AuthModal({
   isOpen,
@@ -53,7 +54,7 @@ export default function AuthModal({
 
     try {
       // Step 1: Call /api/register (password hashed on backend using bcrypt)
-      const res = await fetch("http://localhost:8085/api/register", {
+      const res = await fetch(apiUrl("/api/register"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: u, password: p }),
@@ -70,7 +71,7 @@ export default function AuthModal({
       setAuthToken(token);
 
       // Step 2: Call /api/setup_profile to activate Mohalla shelf
-      const setupRes = await fetch("http://localhost:8085/api/setup_profile", {
+      const setupRes = await fetch(apiUrl("/api/setup_profile"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -114,7 +115,7 @@ export default function AuthModal({
 
     try {
       // Call /api/login (verifies password against bcrypt hash)
-      const res = await fetch("http://localhost:8085/api/login", {
+      const res = await fetch(apiUrl("/api/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: u, password: p }),

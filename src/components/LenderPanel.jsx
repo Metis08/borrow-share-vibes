@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiUrl } from "@/lib/api";
 
 export default function LenderPanel({ currentUser, onAuthRequired }) {
   const [shelfItems, setShelfItems] = useState([]);
@@ -15,7 +16,7 @@ export default function LenderPanel({ currentUser, onAuthRequired }) {
     }
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8085/api/profile", {
+      const res = await fetch(apiUrl("/api/profile"), {
         headers: {
           "Authorization": `Bearer ${currentUser.token}`,
         },
@@ -51,7 +52,7 @@ export default function LenderPanel({ currentUser, onAuthRequired }) {
     if (!itemName) return;
 
     try {
-      const res = await fetch("http://localhost:8085/api/lend", {
+      const res = await fetch(apiUrl("/api/lend"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

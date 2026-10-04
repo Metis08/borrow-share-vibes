@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import React, { useState, useEffect, useRef } from "react";
+import { apiUrl } from "@/lib/api";
 
 export const Route = createFileRoute("/radar")({
   component: MohallaRadarPage,
@@ -7,18 +8,7 @@ export const Route = createFileRoute("/radar")({
 
 const resolveRadarImage = (url) => {
   if (!url) return "";
-  if (
-    url.startsWith("data:") ||
-    url.startsWith("blob:") ||
-    url.startsWith("http://") ||
-    url.startsWith("https://")
-  ) {
-    return url;
-  }
-  if (url.startsWith("/")) {
-    return `http://localhost:8085${url}`;
-  }
-  return url;
+  return apiUrl(url);
 };
 
 export function MohallaRadarPage() {
@@ -36,7 +26,7 @@ export function MohallaRadarPage() {
     const fetchRadar = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch("http://localhost:8085/api/radar/items?lat=28.5494&lng=77.2090&radius=10");
+        const res = await fetch(apiUrl("/api/radar/items?lat=28.5494&lng=77.2090&radius=10"));
         if (res.ok) {
           const data = await res.json();
           setRadarItems(Array.isArray(data) ? data : []);

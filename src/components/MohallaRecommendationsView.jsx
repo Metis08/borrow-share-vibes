@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import AuthModal from "@/components/AuthModal";
 import { getStoredUser, clearSession, isTokenValid, setStoredUser } from "@/lib/auth";
+import { apiUrl } from "@/lib/api";
 
 const CATEGORIES = [
   { id: "All", label: "All", icon: "✨" },
@@ -77,7 +78,7 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
       if (selectedCategory !== "All") params.append("category", selectedCategory);
       if (searchQuery.trim()) params.append("search", searchQuery.trim());
 
-      const res = await fetch(`http://localhost:8085/api/recommendations?${params.toString()}`);
+      const res = await fetch(apiUrl(`/api/recommendations?${params.toString()}`));
       if (res.ok) {
         const data = await res.json();
         setPosts(data || []);
@@ -100,7 +101,7 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
       if (currentUser?.token) {
         headers["Authorization"] = `Bearer ${currentUser.token}`;
       }
-      const res = await fetch(`http://localhost:8085/api/recommendations/detail?id=${postId}`, { headers });
+      const res = await fetch(apiUrl(`/api/recommendations/detail?id=${postId}`), { headers });
       if (res.ok) {
         const data = await res.json();
         setActivePost(data);
@@ -125,7 +126,7 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
 
     setIsSubmittingPost(true);
     try {
-      const res = await fetch("http://localhost:8085/api/recommendations", {
+      const res = await fetch(apiUrl("/api/recommendations"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -173,7 +174,7 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
 
     setIsSubmittingReply(true);
     try {
-      const res = await fetch("http://localhost:8085/api/recommendations/reply", {
+      const res = await fetch(apiUrl("/api/recommendations/reply"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -221,7 +222,7 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
   const handleToggleHelpful = async (replyId) => {
     if (!requireAuth()) return;
     try {
-      const res = await fetch("http://localhost:8085/api/recommendations/reply/helpful", {
+      const res = await fetch(apiUrl("/api/recommendations/reply/helpful"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -245,7 +246,7 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
   const handleToggleEndorse = async (recommendationId) => {
     if (!requireAuth()) return;
     try {
-      const res = await fetch("http://localhost:8085/api/recommendations/endorse", {
+      const res = await fetch(apiUrl("/api/recommendations/endorse"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -273,7 +274,7 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
     if (!currentUser?.token) return;
 
     try {
-      const res = await fetch(`http://localhost:8085/api/recommendations?id=${postId}`, {
+      const res = await fetch(apiUrl(`/api/recommendations?id=${postId}`), {
         method: "DELETE",
         headers: { Authorization: `Bearer ${currentUser.token}` },
       });
