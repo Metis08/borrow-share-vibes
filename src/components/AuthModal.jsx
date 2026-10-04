@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { setStoredUser } from "@/lib/auth";
 
 export default function AuthModal({
   isOpen,
@@ -9,9 +10,19 @@ export default function AuthModal({
 }) {
   const [authMode, setAuthMode] = useState(initialMode); // "register" | "login" | "setup"
 
+  useEffect(() => {
+    if (isOpen) {
+      setAuthMode(initialMode || "login");
+      setErrorMsg("");
+      setSuccessMsg("");
+      setShowPassword(false);
+    }
+  }, [isOpen, initialMode]);
+
   // Form states
   const [usernameValue, setUsernameValue] = useState("");
   const [passwordValue, setPasswordValue] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [phoneValue, setPhoneValue] = useState("");
   const [areaValue, setAreaValue] = useState("");
   const [shelfNameValue, setShelfNameValue] = useState("");
@@ -80,7 +91,7 @@ export default function AuthModal({
 
       // Successful Create Shelf Flow
       const userSession = { username: u, token };
-      localStorage.setItem("mohalla_user", JSON.stringify(userSession));
+      setStoredUser(userSession);
       if (onSuccess) onSuccess(userSession);
       onClose();
     } catch (err) {
@@ -117,7 +128,7 @@ export default function AuthModal({
 
       const data = await res.json();
       const userSession = { username: data.username, token: data.token };
-      localStorage.setItem("mohalla_user", JSON.stringify(userSession));
+      setStoredUser(userSession);
       if (onSuccess) onSuccess(userSession);
       onClose();
     } catch (err) {
@@ -196,14 +207,37 @@ export default function AuthModal({
                       password * (hashed)
                     </span>
                   </div>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={passwordValue}
-                    onChange={(e) => setPasswordValue(e.target.value)}
-                    className="receipt-field"
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={passwordValue}
+                      onChange={(e) => setPasswordValue(e.target.value)}
+                      className="receipt-field pr-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-0 text-neutral-600 hover:text-neutral-900 transition-colors p-1 cursor-pointer focus:outline-none"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                          <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                          <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                          <line x1="2" x2="22" y1="2" y2="22" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -270,6 +304,7 @@ export default function AuthModal({
                   onClick={() => {
                     setErrorMsg("");
                     setSuccessMsg("");
+                    setShowPassword(false);
                     setAuthMode("login");
                   }}
                   className="text-[10px] uppercase tracking-wider text-neutral-600 hover:text-neutral-800 underline cursor-pointer"
@@ -334,14 +369,37 @@ export default function AuthModal({
                       password
                     </span>
                   </div>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={passwordValue}
-                    onChange={(e) => setPasswordValue(e.target.value)}
-                    className="receipt-field"
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={passwordValue}
+                      onChange={(e) => setPasswordValue(e.target.value)}
+                      className="receipt-field pr-8"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-0 text-neutral-600 hover:text-neutral-900 transition-colors p-1 cursor-pointer focus:outline-none"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                          <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                          <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                          <line x1="2" x2="22" y1="2" y2="22" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="pt-2">
@@ -360,6 +418,7 @@ export default function AuthModal({
                   onClick={() => {
                     setErrorMsg("");
                     setSuccessMsg("");
+                    setShowPassword(false);
                     setAuthMode("register");
                   }}
                   className="text-[10px] uppercase tracking-wider text-neutral-600 hover:text-neutral-800 underline cursor-pointer"

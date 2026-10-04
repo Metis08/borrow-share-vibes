@@ -14,10 +14,26 @@ dist-ssr
 .vinxi
 .tanstack/**
 .nitro
+
+# Compiled binaries
+backend/server
+backend/mohalla-backend
+server
 # Environment & Secrets
 .env
 .env.*
 !.env.example
+*.env
+backend/.env
+backend/.env.*
+!backend/.env.example
+serviceAccountKey.json
+*serviceAccount*.json
+*service-account*.json
+*firebase*.json
+*.credentials.json
+*.pem
+*.key
 
 # Database files
 *.db

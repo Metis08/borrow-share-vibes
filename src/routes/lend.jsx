@@ -1,6 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import AuthModal from "@/components/AuthModal";
+import {
+  getStoredUser,
+  setStoredUser,
+  clearSession,
+  isTokenValid,
+  AUTH_CHANGE_EVENT,
+  SESSION_EXPIRED_EVENT,
+  didSessionExpireOnStartup,
+  resetSessionExpiredOnStartupFlag,
+} from "@/lib/auth";
 
 export const Route = createFileRoute("/lend")({
   head: () => ({
@@ -18,30 +28,62 @@ export const Route = createFileRoute("/lend")({
 export function LendPage({ onBack }) {
   const navigate = useNavigate();
 
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem("mohalla_user");
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-
+  const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authTriggerMsg, setAuthTriggerMsg] = useState("");
+  const [authInitialMode, setAuthInitialMode] = useState("login");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (didSessionExpireOnStartup()) {
+      resetSessionExpiredOnStartupFlag();
+      setAuthTriggerMsg("Your session has expired. Please log in again.");
+      setAuthInitialMode("login");
+      setShowAuthModal(true);
+    }
+
+    const handleAuthChange = (e) => {
+      setCurrentUser(e.detail || null);
+    };
+
+    const handleSessionExpired = (e) => {
+      setCurrentUser(null);
+      setAuthTriggerMsg("Your session has expired. Please log in again.");
+      setAuthInitialMode("login");
+      setShowAuthModal(true);
+    };
+
+    window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => {
+      window.removeEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    };
+  }, []);
+
   // Form State
   const [formData, setFormData] = useState({
-    name: currentUser?.username || "Mahek Aghija",
-    area: currentUser?.area || "Block E · Mohalla Terrace",
-    phone: currentUser?.phone || "+91 98765 43210",
+    name: currentUser?.fullName || currentUser?.username || "",
+    area: currentUser?.area || "",
+    phone: currentUser?.phone || "",
     itemTitle: "",
     description: "",
     duration: "7 Days",
     category: "Electronics & Gear",
     condition: "Good Working 👍",
   });
+
+  useEffect(() => {
+    if (currentUser) {
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || currentUser.fullName || currentUser.username || "",
+        area: prev.area || currentUser.area || "",
+        phone: prev.phone || currentUser.phone || "",
+      }));
+    }
+  }, [currentUser]);
 
   const [imagePreview, setImagePreview] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -117,6 +159,14 @@ export function LendPage({ onBack }) {
     e.preventDefault();
     setErrorMessage("");
 
+    if (!currentUser?.token || !isTokenValid(currentUser.token)) {
+      clearSession("expired");
+      setAuthTriggerMsg("Your session has expired. Please log in again.");
+      setAuthInitialMode("login");
+      setShowAuthModal(true);
+      return;
+    }
+
     if (!formData.itemTitle.trim()) {
       setErrorMessage("Please enter an item name or title.");
       return;
@@ -132,10 +182,8 @@ export function LendPage({ onBack }) {
     try {
       const headers = {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${currentUser.token}`,
       };
-      if (currentUser?.token) {
-        headers["Authorization"] = `Bearer ${currentUser.token}`;
-      }
 
       const res = await fetch("http://localhost:8085/api/lend", {
         method: "POST",
@@ -144,9 +192,9 @@ export function LendPage({ onBack }) {
           itemName: formData.itemTitle.trim(),
           category: formData.category,
           description: formData.description.trim(),
-          lenderName: formData.name.trim() || currentUser?.username || "Padosi",
-          area: formData.area.trim() || "Mohalla",
-          phone: formData.phone.trim(),
+          lenderName: formData.name.trim() || currentUser.fullName || currentUser.username,
+          area: formData.area.trim() || currentUser.area || "Mohalla",
+          phone: formData.phone.trim() || currentUser.phone || "",
           duration: formData.duration,
           condition: formData.condition,
           imageUrl: imagePreview || "",
@@ -155,22 +203,14 @@ export function LendPage({ onBack }) {
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(errText || `Server returned error (${res.status})`);
-      }
-
-      // Save user session locally if not set so user is recognized as lender
-      if (!currentUser) {
-        const fallbackSession = {
-          username: formData.name.trim() || "Padosi",
-          area: formData.area.trim(),
-          phone: formData.phone.trim(),
-        };
-        try {
-          localStorage.setItem("mohalla_user", JSON.stringify(fallbackSession));
-          setCurrentUser(fallbackSession);
-        } catch {
-          // ignore
+        if (res.status === 401 || errText.includes("Unauthorized") || errText.includes("expired")) {
+          clearSession("expired");
+          setAuthTriggerMsg("Your session has expired. Please log in again.");
+          setAuthInitialMode("login");
+          setShowAuthModal(true);
+          return;
         }
+        throw new Error(errText || `Server returned error (${res.status})`);
       }
 
       setSubmitted(true);
@@ -198,19 +238,20 @@ export function LendPage({ onBack }) {
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        initialMode="register"
-        triggerMsg="You need an account & shelf to lend items to your Mohalla."
+        initialMode={authInitialMode}
+        triggerMsg={authTriggerMsg || "You need an account & shelf to lend items to your Mohalla."}
         onSuccess={(session) => {
+          setStoredUser(session);
           setCurrentUser(session);
           setFormData((prev) => ({ ...prev, name: session.username }));
         }}
       />
       {/* Main Glass Container */}
-      <div className="w-full max-w-6xl bg-[#0d0f17]/85 backdrop-blur-3xl border border-neutral-800 rounded-[2.5rem] p-6 sm:p-10 shadow-[0_25px_100px_rgba(0,0,0,0.9)] flex flex-col gap-8 relative z-10">
+      <div className="w-full max-w-6xl bg-[#0d0f17]/85 backdrop-blur-3xl border border-neutral-800 rounded-[2.5rem] p-4 sm:p-10 shadow-[0_25px_100px_rgba(0,0,0,0.9)] flex flex-col gap-8 relative z-10">
         
         {/* Top Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800/80 pb-6">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             {onBack ? (
               <button
                 type="button"
@@ -288,9 +329,9 @@ export function LendPage({ onBack }) {
                   }}
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={handleDrop}
-                  className={`min-h-[560px] sm:min-h-[620px] h-full rounded-[2.5rem] ${
+                  className={`min-h-[320px] sm:min-h-[620px] h-full rounded-[2.5rem] ${
                     isDragging ? "bg-[#09414b]/30" : "bg-gradient-to-br from-[#041a21] via-[#031319] to-[#01090d]"
-                  } backdrop-blur-2xl p-7 flex flex-col justify-between relative overflow-hidden transition-all duration-300 shadow-2xl`}
+                  } backdrop-blur-2xl p-6 sm:p-7 flex flex-col justify-between relative overflow-hidden transition-all duration-300 shadow-2xl`}
                 >
                   {/* Top Tag Pills */}
                   <div className="flex flex-wrap items-center gap-2 z-10">

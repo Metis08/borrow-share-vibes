@@ -1,5 +1,22 @@
 import React, { useState, useEffect } from "react";
 import AuthModal from "@/components/AuthModal";
+import { getStoredUser, clearSession, isTokenValid } from "@/lib/auth";
+
+const resolveMomentPhoto = (url) => {
+  if (!url) return "";
+  if (
+    url.startsWith("data:") ||
+    url.startsWith("blob:") ||
+    url.startsWith("http://") ||
+    url.startsWith("https://")
+  ) {
+    return url;
+  }
+  if (url.startsWith("/")) {
+    return `http://localhost:8085${url}`;
+  }
+  return url;
+};
 
 export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
   const [moments, setMoments] = useState([]);
@@ -25,13 +42,17 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
   // Auth Fallback State
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authTriggerMsg, setAuthTriggerMsg] = useState("");
+  const [authInitialMode, setAuthInitialMode] = useState("login");
 
   const requireAuth = (callback, msg) => {
     if (onRequireAuth) {
       return onRequireAuth(callback, msg);
     }
-    if (!currentUser?.token) {
+    const user = getStoredUser();
+    if (!user?.token || !isTokenValid(user.token)) {
+      clearSession("expired");
       setAuthTriggerMsg(msg || "Sign in to share your Mohalla Moment.");
+      setAuthInitialMode("login");
       setShowAuthModal(true);
       return false;
     }
@@ -61,7 +82,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
     }
   };
 
-  // Fetch logged in user's borrow requests to populate dropdown
+  // Fetch logged in user's accepted borrow requests to populate dropdown
   const fetchUserBorrowRequests = async () => {
     if (!currentUser?.token) return;
     try {
@@ -70,11 +91,19 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
       });
       if (res.ok) {
         const data = await res.json();
-        // Filter requests where current user is borrower
+        // Filter requests where current user is borrower AND status is accepted
         const myBorrows = (data || []).filter(
-          (r) => r.borrowerUsername?.toLowerCase() === currentUser.username?.toLowerCase()
+          (r) =>
+            r.borrowerUsername?.toLowerCase() === currentUser.username?.toLowerCase() &&
+            r.status === "accepted"
         );
         setBorrowRequests(myBorrows);
+        if (myBorrows.length > 0) {
+          const first = myBorrows[0];
+          setSelectedBorrowRequestId(String(first.id));
+          setBorrowedItem(first.itemName || "");
+          setLenderName(first.lenderUsername || "");
+        }
       }
     } catch (err) {
       console.error("Failed to fetch user borrow requests:", err);
@@ -127,8 +156,12 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
 
   const handleShareMoment = async (e) => {
     e.preventDefault();
-    if (!borrowedItem.trim() || !usageHeadline.trim() || !usageDescription.trim()) {
-      alert("Please fill in the borrowed item name, usage headline, and description.");
+    if (!selectedBorrowRequestId) {
+      alert("Please select an accepted borrow request.");
+      return;
+    }
+    if (!usageHeadline.trim() || !usageDescription.trim()) {
+      alert("Please fill in the usage headline and description.");
       return;
     }
 
@@ -137,10 +170,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
     setIsSubmitting(true);
     try {
       const payload = {
-        borrowRequestId: selectedBorrowRequestId ? parseInt(selectedBorrowRequestId, 10) : 0,
-        lenderUsername: lenderName.trim() || "Neighbour",
-        itemName: borrowedItem.trim(),
-        itemCategory: itemCategory.trim() || "Borrowed Item",
+        borrowRequestId: parseInt(selectedBorrowRequestId, 10),
         usageHeadline: usageHeadline.trim(),
         usageDescription: usageDescription.trim(),
         thankYouMessage: thankYouMessage.trim(),
@@ -187,7 +217,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
 
   return (
     <div className="flex flex-col gap-8 py-2 animate-fadeIn relative">
-      
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-5 right-5 z-[120] bg-[#facc15] text-black font-semibold text-sm px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 border border-yellow-300 animate-bounce">
@@ -210,7 +240,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
             कहानी मोहल्ले मोहल्ले की
           </h2>
         </div>
-        
+
         <div className="flex flex-col sm:items-end gap-3">
           <p className="text-xs text-neutral-400 max-w-md leading-relaxed text-left sm:text-right">
             Real stories, uploaded photos, and gratitude behind every borrowed object in your neighborhood.
@@ -245,13 +275,13 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#0a3038] to-[#0c5360] border border-[#146b7a] flex items-center justify-center text-teal-100 text-3xl shadow-xl">
             🤝
           </div>
-          
+
           <div className="space-y-2 max-w-md">
             <h3 className="text-2xl sm:text-3xl font-bold text-[#f5e6c8]">
-              अभी कोई मोहल्ला मोमेंट नहीं है।
+              NO MOHALLA MOMENTS YET
             </h3>
             <p className="text-xs sm:text-sm text-neutral-400 font-mono leading-relaxed">
-              Borrow something from a neighbour, use it, and share your real moment with photos & gratitude!
+              Your first borrow could become one. Real community stories appear here once neighbours complete a borrow.
             </p>
           </div>
 
@@ -295,10 +325,10 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
 
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col gap-6">
-                  
+
                   {/* Top White & Dark Bluish Teal Modular Blocks Row */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    
+
                     {/* 1. Upper White Spec Block */}
                     <div className="lg:col-span-7 bg-white text-black p-6 sm:p-8 rounded-3xl flex flex-col justify-between gap-6 shadow-lg">
                       <div>
@@ -361,13 +391,13 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
 
                   {/* Bottom Row: Thumbnail Box & Detail Thank-You Note */}
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                    
+
                     {/* 3. Bottom-Left Image Card (Displays Real Uploaded Photos) */}
                     <div className="md:col-span-4 bg-neutral-900 border border-neutral-800 p-4 rounded-3xl flex flex-col items-center justify-center shrink-0 min-h-[140px] relative overflow-hidden group">
                       {hasPhotos ? (
                         <>
                           <img
-                            src={currentPhoto}
+                            src={resolveMomentPhoto(currentPhoto)}
                             alt={`${moment.itemName} usage photo`}
                             className="max-h-32 w-full object-cover rounded-2xl filter drop-shadow-md group-hover:scale-105 transition-transform"
                           />
@@ -434,11 +464,11 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
                       MOHALLA LOVE 💛
                     </span>
                   </div>
-                  
+
                   <div className="my-auto py-6 flex flex-col items-center justify-center z-10">
                     {hasPhotos ? (
                       <img
-                        src={currentPhoto}
+                        src={resolveMomentPhoto(currentPhoto)}
                         alt={moment.borrowerUsername}
                         className="max-h-48 w-full object-cover rounded-2xl filter drop-shadow-[0_15px_25px_rgba(0,0,0,0.8)]"
                       />
@@ -468,7 +498,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
       {showShareModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
           <div className="relative w-full max-w-lg bg-[#111722] border border-neutral-800 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
-            
+
             <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
               <div>
                 <h3 className="text-xl font-bold text-[#f5e6c8]">
@@ -488,58 +518,66 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
               </button>
             </div>
 
-            <form onSubmit={handleShareMoment} className="space-y-4">
-              
-              {/* Option to Pick from Accepted Borrows */}
-              {borrowRequests.length > 0 && (
+            {borrowRequests.length === 0 ? (
+              <div className="bg-neutral-900/90 border border-neutral-800 rounded-2xl p-6 text-center space-y-3">
+                <div className="w-14 h-14 rounded-full bg-neutral-800 border border-neutral-700 mx-auto flex items-center justify-center text-2xl">
+                  🤝
+                </div>
+                <h4 className="text-base font-bold text-[#f5e6c8]">No Accepted Borrows Yet</h4>
+                <p className="text-xs text-neutral-400 font-mono leading-relaxed max-w-sm mx-auto">
+                  A Mohalla Moment must represent a real borrowing interaction. Find an item in Explore the Mohalla, send a borrow request, and once accepted by the owner, you can share your real experience, photo, and thank-you note here!
+                </p>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowShareModal(false)}
+                    className="bg-[#facc15] hover:bg-yellow-300 text-black font-extrabold text-xs uppercase px-5 py-2.5 rounded-xl shadow-lg transition-all"
+                  >
+                    Got It
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleShareMoment} className="space-y-4">
+
+                {/* Select from Accepted Borrows */}
                 <div>
                   <label className="block text-xs font-mono uppercase tracking-wider text-amber-300 mb-1">
-                    Pick From Your Recent Borrow Requests
+                    Select Your Accepted Borrow *
                   </label>
                   <select
                     value={selectedBorrowRequestId}
                     onChange={handleSelectBorrowRequest}
+                    required
                     className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-yellow-500/50"
                   >
-                    <option value="">-- Or enter borrow details manually below --</option>
                     {borrowRequests.map((req) => (
                       <option key={req.id} value={req.id}>
-                        {req.itemName} (Lender: {req.lenderUsername})
+                        {req.itemName} (Lender: @{req.lenderUsername})
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-mono uppercase tracking-wider text-neutral-300 mb-1">
-                    Borrowed Item *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Projector, Leica Camera..."
-                    value={borrowedItem}
-                    onChange={(e) => setBorrowedItem(e.target.value)}
-                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-yellow-500/50"
-                  />
-                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 mb-1">
+                      Borrowed Item
+                    </label>
+                    <div className="w-full bg-neutral-900/80 border border-neutral-800 rounded-xl p-3 text-xs text-amber-300 font-bold font-mono truncate">
+                      {borrowedItem || "Selected Item"}
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-mono uppercase tracking-wider text-neutral-300 mb-1">
-                    Lender&apos;s Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Priya, Aarav..."
-                    value={lenderName}
-                    onChange={(e) => setLenderName(e.target.value)}
-                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl p-3 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-yellow-500/50"
-                  />
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-neutral-400 mb-1">
+                      Lender
+                    </label>
+                    <div className="w-full bg-neutral-900/80 border border-neutral-800 rounded-xl p-3 text-xs text-teal-200 font-bold font-mono truncate">
+                      @{lenderName || "Lender"}
+                    </div>
+                  </div>
                 </div>
-              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -655,6 +693,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
                 </button>
               </div>
             </form>
+            )}
 
           </div>
         </div>
@@ -664,7 +703,7 @@ export default function MohallaStoriesView({ currentUser, onRequireAuth }) {
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        initialMode="register"
+        initialMode={authInitialMode}
         triggerMsg={authTriggerMsg}
       />
 

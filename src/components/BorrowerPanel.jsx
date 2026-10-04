@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { clearSession } from "@/lib/auth";
 
 export default function BorrowerPanel({ currentUser, onAuthRequired, onBorrowSuccess }) {
   const [q, setQ] = useState("");
@@ -59,7 +60,7 @@ export default function BorrowerPanel({ currentUser, onAuthRequired, onBorrowSuc
       } else {
         const text = await res.text();
         if (res.status === 401 || text.toLowerCase().includes("unauthorized") || text.toLowerCase().includes("expired")) {
-          try { localStorage.removeItem("mohalla_user"); } catch {}
+          clearSession("expired");
           onAuthRequired("Your session expired. Please sign in or create your shelf to send a borrow request.");
         } else {
           alert(text || "Failed to submit borrow request.");

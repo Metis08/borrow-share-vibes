@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import AuthModal from "@/components/AuthModal";
+import { getStoredUser, clearSession, isTokenValid, setStoredUser } from "@/lib/auth";
 
 const CATEGORIES = [
   { id: "All", label: "All", icon: "✨" },
@@ -46,13 +47,17 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
   // Auth Modal State fallback
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authTriggerMsg, setAuthTriggerMsg] = useState("");
+  const [authInitialMode, setAuthInitialMode] = useState("login");
 
   const requireAuth = (callback, msg) => {
     if (onRequireAuth) {
       return onRequireAuth(callback, msg);
     }
-    if (!currentUser?.token) {
+    const user = getStoredUser();
+    if (!user?.token || !isTokenValid(user.token)) {
+      clearSession("expired");
       setAuthTriggerMsg(msg || "Sign in to ask your mohalla or share recommendations.");
+      setAuthInitialMode("login");
       setShowAuthModal(true);
       return false;
     }
@@ -79,7 +84,7 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
       }
     } catch (err) {
       console.error("Failed to fetch recommendations:", err);
-    } fontally: {
+    } finally {
       setLoading(false);
     }
   };
@@ -143,6 +148,14 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
         fetchPosts();
       } else {
         const txt = await res.text();
+        if (res.status === 401 || txt.includes("Unauthorized") || txt.includes("expired")) {
+          setShowCreateModal(false);
+          clearSession("expired");
+          setAuthTriggerMsg("Your session has expired. Please log in again.");
+          setAuthInitialMode("login");
+          setShowAuthModal(true);
+          return;
+        }
         setPostError(txt || "Failed to create post.");
       }
     } catch (err) {
@@ -188,6 +201,13 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
         fetchPosts();
       } else {
         const txt = await res.text();
+        if (res.status === 401 || txt.includes("Unauthorized") || txt.includes("expired")) {
+          clearSession("expired");
+          setAuthTriggerMsg("Your session has expired. Please log in again.");
+          setAuthInitialMode("login");
+          setShowAuthModal(true);
+          return;
+        }
         alert(txt || "Failed to post reply.");
       }
     } catch (err) {
@@ -211,6 +231,11 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
       });
       if (res.ok) {
         openPostDetail(activePost.id);
+      } else if (res.status === 401) {
+        clearSession("expired");
+        setAuthTriggerMsg("Your session has expired. Please log in again.");
+        setAuthInitialMode("login");
+        setShowAuthModal(true);
       }
     } catch (err) {
       console.error(err);
@@ -231,6 +256,11 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
       if (res.ok) {
         if (activePost) openPostDetail(activePost.id);
         fetchPosts();
+      } else if (res.status === 401) {
+        clearSession("expired");
+        setAuthTriggerMsg("Your session has expired. Please log in again.");
+        setAuthInitialMode("login");
+        setShowAuthModal(true);
       }
     } catch (err) {
       console.error(err);
@@ -492,7 +522,7 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
           <div className="relative w-full max-w-2xl max-h-[90vh] bg-[#111722] border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
             
             {/* Header */}
-            <div className="px-6 py-4 border-b border-neutral-800 flex items-center justify-between bg-neutral-900/60">
+            <div className="px-4 sm:px-6 py-4 border-b border-neutral-800 flex items-center justify-between bg-neutral-900/60">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-yellow-500/10 text-[#facc15] border border-yellow-500/20 font-bold">
                   {activePost.category}
@@ -511,11 +541,11 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
             </div>
 
             {/* Scrollable Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
               
               {/* Question Banner */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between gap-2 text-xs text-neutral-400 font-mono">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-400 font-mono">
                   <span>Asked by @{activePost.username}</span>
                   {currentUser?.username !== activePost.username && onNavigateLend && (
                     <button
@@ -726,8 +756,8 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
 
       {/* CREATE POST MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-lg bg-[#111722] border border-neutral-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#111722] border border-neutral-800 rounded-3xl p-5 sm:p-8 space-y-6 shadow-2xl">
             
             <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
               <div>
@@ -832,12 +862,10 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        initialMode="register"
+        initialMode={authInitialMode}
         triggerMsg={authTriggerMsg}
         onSuccess={(session) => {
-          if (currentUser) {
-            // Updated
-          }
+          setStoredUser(session);
         }}
       />
 

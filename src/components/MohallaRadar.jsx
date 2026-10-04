@@ -140,149 +140,24 @@ const create3dBuildingCanvasLayer = (L, centerLat, centerLng) => {
   return new CanvasLayer();
 };
 
-const getItemImage = (item) => {
-  if (item?.image) return item.image;
-  if (item?.photo) return item.photo;
-  const name = ((item?.itemName || item?.title || "") + " " + (item?.category || "")).toLowerCase();
-  if (name.includes("cam") || name.includes("photo") || name.includes("lens")) {
-    return "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=600";
+// Resolve genuine uploaded photo URL or empty string (no stock/Unsplash fallbacks)
+const resolveRadarImage = (item) => {
+  const raw = String(item?.imageUrl || item?.image_url || item?.image || item?.photo || "").trim();
+  if (!raw) return "";
+  if (
+    raw.startsWith("data:") ||
+    raw.startsWith("blob:") ||
+    raw.startsWith("http://") ||
+    raw.startsWith("https://")
+  ) {
+    return raw;
   }
-  if (name.includes("proj")) {
-    return "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=600";
+  if (raw.startsWith("/")) {
+    const apiBase = (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) || "http://localhost:8085";
+    return `${apiBase}${raw}`;
   }
-  if (name.includes("tripod") || name.includes("stand")) {
-    return "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&q=80&w=600";
-  }
-  if (name.includes("ladder") || name.includes("drill") || name.includes("tool") || name.includes("hammer")) {
-    return "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&q=80&w=600";
-  }
-  if (name.includes("tent") || name.includes("camp") || name.includes("outdoor")) {
-    return "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&q=80&w=600";
-  }
-  if (name.includes("speaker") || name.includes("audio") || name.includes("sound") || name.includes("party")) {
-    return "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&q=80&w=600";
-  }
-  if (name.includes("book") || name.includes("read") || name.includes("novel")) {
-    return "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=600";
-  }
-  if (name.includes("game") || name.includes("jenga") || name.includes("board")) {
-    return "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?auto=format&fit=crop&q=80&w=600";
-  }
-  return "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&q=80&w=600";
+  return raw;
 };
-
-const getMockupItems = (lat, lng) => [
-  { 
-    id: "fallback-cam", 
-    itemName: "Sony Alpha DSLR", 
-    category: "Electronics", 
-    description: "Full-frame 4K Mirrorless Camera", 
-    distanceKm: 0.35, 
-    owner: "Priyanka S.", 
-    shelfName: "Priyanka's Shelf",
-    phone: "9876543212",
-    latitude: lat + 0.0018, 
-    longitude: lng - 0.0025, 
-    locationName: "Govindpuri Block B",
-    image: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=80&w=600",
-    hasPin: true
-  },
-  { 
-    id: "fallback-proj", 
-    itemName: "Full HD Projector", 
-    category: "Electronics", 
-    description: "4K Home Theater Projector with screen", 
-    distanceKm: 0.50, 
-    owner: "Mahek A.", 
-    shelfName: "Mahek's Shelf",
-    phone: "9876543210",
-    latitude: lat - 0.0015, 
-    longitude: lng + 0.0028, 
-    locationName: "Kalkaji D-Block",
-    image: "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?auto=format&fit=crop&q=80&w=600",
-    hasPin: true
-  },
-  { 
-    id: "fallback-tripod", 
-    itemName: "Carbon Tripod", 
-    category: "Electronics", 
-    description: "Professional lightweight camera tripod", 
-    distanceKm: 0.65, 
-    owner: "Ritu M.", 
-    shelfName: "Ritu's Shelf",
-    phone: "9876543216",
-    latitude: lat + 0.0032, 
-    longitude: lng + 0.0019, 
-    locationName: "Nehru Enclave",
-    image: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&q=80&w=600",
-    hasPin: true
-  },
-  { 
-    id: "fallback-lad", 
-    itemName: "Telescopic Ladder", 
-    category: "Tools", 
-    description: "12-foot heavy duty aluminum ladder", 
-    distanceKm: 0.85, 
-    owner: "Rohan K.", 
-    shelfName: "Rohan's Shelf",
-    phone: "9876543211",
-    latitude: lat - 0.0028, 
-    longitude: lng - 0.0035, 
-    locationName: "Alaknanda",
-    image: "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&q=80&w=600",
-    hasPin: true
-  },
-  { 
-    id: "fallback-tent", 
-    itemName: "Quechua 3P Tent", 
-    category: "Outdoor", 
-    description: "Waterproof 3-person waterproof tent", 
-    distanceKm: 1.10, 
-    owner: "Vikram P.", 
-    shelfName: "Vikram's Shelf",
-    phone: "9876543214",
-    latitude: lat + 0.0042, 
-    longitude: lng - 0.0048, 
-    locationName: "Chittaranjan Park",
-    image: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&q=80&w=600",
-    hasPin: true
-  },
-  { 
-    id: "fallback-speaker", 
-    itemName: "JBL PartyBox", 
-    category: "Events", 
-    description: "High bass bluetooth party speaker", 
-    distanceKm: 1.25, 
-    owner: "Aman T.", 
-    shelfName: "Aman's Shelf",
-    phone: "9876543215",
-    latitude: lat - 0.0038, 
-    longitude: lng + 0.0045, 
-    locationName: "GK-II",
-    image: "https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&q=80&w=600",
-    hasPin: true
-  },
-  { 
-    id: "fallback-gk", 
-    itemName: "Greater Kailash",
-    category: "Other", 
-    latitude: lat - 0.003, 
-    longitude: lng - 0.005, 
-    locationName: "Greater Kailash", 
-    isDecorationOnly: true,
-    hasPin: false
-  },
-  { 
-    id: "fallback-kalkaji", 
-    itemName: "Kalkaji",
-    category: "Other", 
-    latitude: lat + 0.003, 
-    longitude: lng - 0.001, 
-    locationName: "Kalkaji", 
-    isDecorationOnly: true,
-    hasPin: false
-  }
-];
 
 export default function MohallaRadar({ 
   currentUser, 
@@ -388,7 +263,7 @@ export default function MohallaRadar({
     }
   }, [items, onItemsUpdate]);
 
-  // Fetch items from database via backend
+  // Fetch items from database via backend (clean, no mock merge or fallback)
   const fetchRadarItems = async () => {
     setLoading(true);
     setErrorMsg("");
@@ -397,16 +272,13 @@ export default function MohallaRadar({
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        const apiItems = data || [];
-        const mocks = getMockupItems(centerLat, centerLng);
-        const merged = [...apiItems, ...mocks.filter(m => !apiItems.some(i => i.itemName.toLowerCase() === m.itemName.toLowerCase()))];
-        setItems(merged);
+        setItems(Array.isArray(data) ? data : []);
       } else {
-        setItems(getMockupItems(centerLat, centerLng));
+        setItems([]);
       }
     } catch (err) {
       console.error("Error loading radar items:", err);
-      setItems(getMockupItems(centerLat, centerLng));
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -491,18 +363,16 @@ export default function MohallaRadar({
       return;
     }
     try {
-      const res = await fetch("http://localhost:8085/api/borrow", {
+      const res = await fetch("http://localhost:8085/api/borrow-requests", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${currentUser.token}`,
         },
         body: JSON.stringify({
-          itemId: `radar-item-${item.id}`,
+          itemId: String(item.id),
           itemName: item.itemName,
           lender: item.owner,
-          daysLeft: 3,
-          since: "borrowed today",
           note: item.description || `Borrowed via radar (${formatKm(item.distanceKm)} away)`,
         }),
       });
@@ -510,7 +380,8 @@ export default function MohallaRadar({
         setSelectedRadarItem(null);
         onBorrowSuccess(item.itemName);
       } else {
-        alert("Failed to submit request to borrow on server.");
+        const text = await res.text();
+        alert(text || "Failed to submit request to borrow on server.");
       }
     } catch (err) {
       console.error(err);
@@ -549,11 +420,21 @@ export default function MohallaRadar({
     mapInstanceRef.current = map;
 
     // 1. Dark Base Map with Dark Grey Area Lines (roads, avenues, boundaries)
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
+    const cartoKey = import.meta.env.VITE_CARTO_API_KEY || import.meta.env.VITE_MAP_API_KEY || "";
+    const baseTileUrl = cartoKey
+      ? `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${cartoKey}`
+      : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+    const labelsTileUrl = cartoKey
+      ? `https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png?key=${cartoKey}`
+      : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
+
+    L.tileLayer(baseTileUrl, {
       maxZoom: 20,
-      subdomains: "abcd",
+      subdomains: cartoKey ? "abcd" : "",
       className: "mohalla-dark-map-base",
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+      attribution: cartoKey
+        ? '&copy; OpenStreetMap contributors &copy; CARTO'
+        : '&copy; Esri, HERE, Garmin, OpenStreetMap contributors'
     }).addTo(map);
 
     // 2. 3D Extruded Building Layer
@@ -561,9 +442,9 @@ export default function MohallaRadar({
     buildingCanvas.addTo(map);
 
     // 3. Dedicated Map Labels Layer with Dark Grey Area & Locality Names
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", {
+    L.tileLayer(labelsTileUrl, {
       maxZoom: 20,
-      subdomains: "abcd",
+      subdomains: cartoKey ? "abcd" : "",
       className: "mohalla-dark-map-labels",
       zIndex: 10
     }).addTo(map);
@@ -888,7 +769,7 @@ export default function MohallaRadar({
       )}
  
       {errorMsg && (
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 z-40 bg-slate-950/95 border border-white/10 p-6 rounded text-center shadow-2xl w-80">
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 z-40 bg-slate-950/95 border border-white/10 p-5 sm:p-6 rounded text-center shadow-2xl w-[calc(100vw-32px)] max-w-xs sm:w-80">
           <span className="text-2xl mb-1 block">📡</span>
           <p className="font-mono text-xs text-[#cfbda3] tracking-widest uppercase mb-4">{errorMsg}</p>
           <button
@@ -901,7 +782,7 @@ export default function MohallaRadar({
       )}
  
       {items.length === 0 && !loading && !errorMsg && !embedMode && (
-        <div className="absolute top-1/7 left-1/2 -translate-x-1/2 z-45 bg-[#0a121e]/95 border border-white/15 p-6 rounded text-center shadow-2xl w-80 backdrop-blur-md">
+        <div className="absolute top-1/7 left-1/2 -translate-x-1/2 z-45 bg-[#0a121e]/95 border border-white/15 p-5 sm:p-6 rounded text-center shadow-2xl w-[calc(100vw-32px)] max-w-xs sm:w-80 backdrop-blur-md">
           <span className="text-3xl block mb-2">🤷‍♂️</span>
           <h5 className="font-display text-lg font-bold text-white mb-1">Your neighbourhood is quiet...</h5>
           <p className="font-mono text-sm uppercase tracking-wider text-panel-note mb-4">

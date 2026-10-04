@@ -5,120 +5,21 @@ export const Route = createFileRoute("/radar")({
   component: MohallaRadarPage,
 });
 
-const radarItems = [
-  {
-    id: "camera",
-    title: "Leica M6 Rangefinder Camera",
-    owner: "Dev Anand",
-    distance: "120m away",
-    distMeters: 120,
-    category: "Electronics & Gear",
-    lat: 28.5494,
-    lng: 77.2090,
-    status: "Available Now",
-    code: "LCM-904",
-    image: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&q=80&w=600",
-    desc: "35mm analog film camera in pristine condition with 50mm f/2 Summicron lens."
-  },
-  {
-    id: "calc",
-    title: "Casio FX-991CW Scientific Calculator",
-    owner: "Riya Sharma",
-    distance: "50m away",
-    distMeters: 50,
-    category: "Electronics & Gear",
-    lat: 28.5498,
-    lng: 77.2096,
-    status: "Available Now",
-    code: "CSC-102",
-    image: "https://images.unsplash.com/photo-1594980596870-8aa52a78d8cd?auto=format&fit=crop&q=80&w=600",
-    desc: "ClassWiz scientific calculator, essential for engineering exams & calculations."
-  },
-  {
-    id: "hammer",
-    title: "Stanley 16oz Claw Hammer",
-    owner: "Karan Johar",
-    distance: "220m away",
-    distMeters: 220,
-    category: "Tools & Repair",
-    lat: 28.5488,
-    lng: 77.2082,
-    status: "Available Now",
-    code: "STH-441",
-    image: "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&q=80&w=600",
-    desc: "Heavy-duty steel claw hammer with ergonomic grip for household repairs."
-  },
-  {
-    id: "racket",
-    title: "Yonex Astrox Pro Tennis Racket",
-    owner: "Ananya Panday",
-    distance: "350m away",
-    distMeters: 350,
-    category: "Board Games & Recreation",
-    lat: 28.5505,
-    lng: 77.2105,
-    status: "In Use (Free Sep 14)",
-    code: "YTR-782",
-    image: "https://images.unsplash.com/photo-1622279457486-62dcc4a431d6?auto=format&fit=crop&q=80&w=600",
-    desc: "High-strung graphite tennis racket with dampener & carrying bag."
-  },
-  {
-    id: "jenga",
-    title: "Jenga Giant Hardwood Tower",
-    owner: "Rahul Mehta",
-    distance: "180m away",
-    distMeters: 180,
-    category: "Board Games & Recreation",
-    lat: 28.5491,
-    lng: 77.2101,
-    status: "Available Now",
-    code: "JGT-009",
-    image: "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?auto=format&fit=crop&q=80&w=600",
-    desc: "Precision crafted wooden block stacking game. Perfect for weekend block parties."
-  },
-  {
-    id: "drill",
-    title: "Bosch Professional Power Drill 18V",
-    owner: "Vikram Malhotra",
-    distance: "410m away",
-    distMeters: 410,
-    category: "Tools & Repair",
-    lat: 28.5479,
-    lng: 77.2075,
-    status: "Available Now",
-    code: "BPD-512",
-    image: "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=600",
-    desc: "Cordless masonry impact drill with complete 30-piece drill bit set."
-  },
-  {
-    id: "tent",
-    title: "Coleman Sundome 4-Person Tent",
-    owner: "Siddharth Rao",
-    distance: "290m away",
-    distMeters: 290,
-    category: "Household Essentials",
-    lat: 28.5512,
-    lng: 77.2088,
-    status: "Available Now",
-    code: "CST-330",
-    image: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&q=80&w=600",
-    desc: "Weatherproof dome tent with ground sheet & quick setup poles."
-  },
-  {
-    id: "keyboard",
-    title: "Keychron K2 Mechanical Keyboard",
-    owner: "Priya Kapoor",
-    distance: "90m away",
-    distMeters: 90,
-    category: "Electronics & Gear",
-    lat: 28.5496,
-    lng: 77.2087,
-    status: "Available Now",
-    code: "KKB-881",
-    image: "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&q=80&w=600",
-    desc: "Wireless RGB mechanical keyboard with Gateron Brown switches."
+const resolveRadarImage = (url) => {
+  if (!url) return "";
+  if (
+    url.startsWith("data:") ||
+    url.startsWith("blob:") ||
+    url.startsWith("http://") ||
+    url.startsWith("https://")
+  ) {
+    return url;
   }
-];
+  if (url.startsWith("/")) {
+    return `http://localhost:8085${url}`;
+  }
+  return url;
+};
 
 export function MohallaRadarPage() {
   const mapContainerRef = useRef(null);
@@ -126,17 +27,47 @@ export function MohallaRadarPage() {
   const markersGroupRef = useRef(null);
   const [filterRadius, setFilterRadius] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [radarItems, setRadarItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Fetch real items from backend Radar API
+  useEffect(() => {
+    const fetchRadar = async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch("http://localhost:8085/api/radar/items?lat=28.5494&lng=77.2090&radius=10");
+        if (res.ok) {
+          const data = await res.json();
+          setRadarItems(Array.isArray(data) ? data : []);
+        } else {
+          setRadarItems([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch radar items:", err);
+        setRadarItems([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchRadar();
+  }, []);
 
   const filteredItems = radarItems.filter((item) => {
-    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.category.toLowerCase().includes(searchQuery.toLowerCase());
-    
+    const title = item.itemName || item.title || "";
+    const owner = item.shelfName || item.owner || "";
+    const cat = item.category || "";
+    const matchesSearch =
+      title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      cat.toLowerCase().includes(searchQuery.toLowerCase());
+
     if (!matchesSearch) return false;
-    if (filterRadius === "100m") return item.distMeters <= 100;
-    if (filterRadius === "250m") return item.distMeters <= 250;
-    if (filterRadius === "tools") return item.category.includes("Tools");
-    if (filterRadius === "electronics") return item.category.includes("Electronics");
+    const distMeters = (item.distanceKm || item.distanceKM || 0) * 1000;
+    if (filterRadius === "100m") return distMeters <= 100;
+    if (filterRadius === "250m") return distMeters <= 250;
+    if (filterRadius === "tools") return cat.toLowerCase().includes("tool");
+    if (filterRadius === "electronics") return cat.toLowerCase().includes("electronic") || cat.toLowerCase().includes("gear");
     return true;
   });
 
@@ -165,17 +96,27 @@ export function MohallaRadarPage() {
       });
 
       // 1. Dark Base Map with Light Grey Area Lines (roads, avenues, boundaries)
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", {
-        maxZoom: 20,
-        subdomains: "abcd",
+      const cartoKey = import.meta.env.VITE_CARTO_API_KEY || import.meta.env.VITE_MAP_API_KEY || "";
+      const baseTileUrl = cartoKey
+        ? `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${cartoKey}`
+        : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
+      const labelsTileUrl = cartoKey
+        ? `https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png?key=${cartoKey}`
+        : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
+
+      L.tileLayer(baseTileUrl, {
+        maxZoom: 19,
+        subdomains: cartoKey ? "abcd" : "",
         className: "mohalla-dark-map-base",
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        attribution: cartoKey
+          ? '&copy; OpenStreetMap contributors &copy; CARTO'
+          : '&copy; Esri, HERE, Garmin, OpenStreetMap contributors'
       }).addTo(map);
 
       // 2. Dedicated Map Labels Layer with Crisp Light Grey Area & Locality Text
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png", {
-        maxZoom: 20,
-        subdomains: "abcd",
+      L.tileLayer(labelsTileUrl, {
+        maxZoom: 19,
+        subdomains: cartoKey ? "abcd" : "",
         className: "mohalla-dark-map-labels",
         zIndex: 10
       }).addTo(map);
@@ -240,20 +181,30 @@ export function MohallaRadarPage() {
       const { L, markersGroup } = markersGroupRef.current;
       renderMarkers(filteredItems, L, markersGroup);
     }
-  }, [filterRadius, searchQuery]);
+  }, [filteredItems, filterRadius, searchQuery]);
 
   const renderMarkers = (items, L, markersGroup) => {
     markersGroup.clearLayers();
     items.forEach((item) => {
+      const lat = item.latitude || item.lat;
+      const lng = item.longitude || item.lng;
+      if (!lat || !lng) return;
+
+      const title = item.itemName || item.title || "Item";
+      const owner = item.shelfName || item.owner || "Neighbour";
+      const category = item.category || "General";
+      const distanceStr = item.distanceKm ? `${item.distanceKm.toFixed(2)}km away` : (item.distance || "Nearby");
+      const img = resolveRadarImage(item.imageUrl || item.image_url || item.image);
+
       const markerIcon = L.divIcon({
         className: "custom-item-marker",
         html: `
           <div class="group relative cursor-pointer flex flex-col items-center select-none">
             <div class="w-11 h-11 rounded-2xl bg-[#0d0f17] border border-neutral-700 shadow-2xl p-1 flex items-center justify-center transform transition-transform group-hover:scale-110">
-              <img src="${item.image}" alt="${item.title}" class="w-full h-full object-contain rounded-xl" />
+              ${img ? `<img src="${img}" alt="${title}" class="w-full h-full object-contain rounded-xl" />` : `<span class="text-xl">📦</span>`}
             </div>
             <div class="mt-1 bg-neutral-950/90 text-neutral-300 text-[10px] font-mono px-2 py-0.5 rounded-md border border-neutral-800 whitespace-nowrap shadow-md">
-              ${item.title.split(' ')[0]} • ${item.distance}
+              ${title.split(' ')[0]} • ${distanceStr}
             </div>
           </div>
         `,
@@ -264,18 +215,18 @@ export function MohallaRadarPage() {
       const popupContent = `
         <div style="background-color: #0d0f17; border: 1px solid #1e293b; border-radius: 1.25rem; padding: 14px; color: white; width: 230px; font-family: sans-serif; box-shadow: 0 20px 40px rgba(0,0,0,0.9);">
           <div style="width: 100%; height: 100px; margin-bottom: 10px; border-radius: 12px; overflow: hidden; background: #04090d; display: flex; align-items: center; justify-content: center;">
-            <img src="${item.image}" alt="${item.title}" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+            ${img ? `<img src="${img}" alt="${title}" style="max-width: 100%; max-height: 100%; object-fit: contain;" />` : `<span style="font-size: 32px;">📦</span>`}
           </div>
-          <div style="font-size: 10px; font-family: monospace; color: #94a3b8; margin-bottom: 3px;">${item.category} • ${item.distance}</div>
-          <div style="font-weight: 700; font-size: 13px; line-height: 1.3; margin-bottom: 4px; color: #ffffff;">${item.title}</div>
-          <div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Lender: <strong style="color: #ffffff;">${item.owner}</strong></div>
-          <a href="/peek?borrow=${item.id}" style="display: block; width: 100%; text-align: center; background: linear-gradient(to right, #09414b, #083842); color: #ffffff; font-weight: 700; font-size: 11px; padding: 9px 0; border-radius: 9999px; text-decoration: none; border: 1px solid #1e293b;">
+          <div style="font-size: 10px; font-family: monospace; color: #94a3b8; margin-bottom: 3px;">${category} • ${distanceStr}</div>
+          <div style="font-weight: 700; font-size: 13px; line-height: 1.3; margin-bottom: 4px; color: #ffffff;">${title}</div>
+          <div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Lender: <strong style="color: #ffffff;">${owner}</strong></div>
+          <a href="/peek?tab=explore" style="display: block; width: 100%; text-align: center; background: linear-gradient(to right, #09414b, #083842); color: #ffffff; font-weight: 700; font-size: 11px; padding: 9px 0; border-radius: 9999px; text-decoration: none; border: 1px solid #1e293b;">
             Request to Borrow ⚡
           </a>
         </div>
       `;
 
-      L.marker([item.lat, item.lng], { icon: markerIcon })
+      L.marker([lat, lng], { icon: markerIcon })
         .addTo(markersGroup)
         .bindPopup(popupContent, {
           closeButton: false,
@@ -290,7 +241,7 @@ export function MohallaRadarPage() {
       <header className="sticky top-0 z-40 bg-[#07080c]/90 backdrop-blur-2xl border-b border-neutral-800/80 px-6 py-4 flex items-center justify-between shrink-0">
         {/* Left Brand Logo in Hindi */}
         <div className="flex items-center gap-3">
-          <Link to="/peek" className="flex items-center gap-2.5 group">
+          <Link to="/peek" search={{ tab: "explore" }} className="flex items-center gap-2.5 group cursor-pointer">
             <span className="w-8 h-8 rounded-full bg-[#083842] border border-neutral-800 flex items-center justify-center font-bold text-teal-100 text-xs shadow-md">
               म
             </span>
@@ -302,16 +253,38 @@ export function MohallaRadarPage() {
 
         {/* Center Navbar Links */}
         <nav className="hidden md:flex items-center gap-8 text-xs font-medium tracking-wide text-neutral-300">
-          <Link to="/peek" className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer">
+          <Link
+            to="/peek"
+            search={{ tab: "explore" }}
+            className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
+          >
             Explore your Mohalla
           </Link>
-          <Link to="/peek" className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer">
+          <Link
+            to="/peek"
+            search={{ tab: "stories" }}
+            className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
+          >
             Mohalla Stories
           </Link>
-          <Link to="/peek" className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer">
+          <Link
+            to="/recommendations"
+            className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
+          >
+            Recommendations
+          </Link>
+          <Link
+            to="/peek"
+            search={{ tab: "messages" }}
+            className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
+          >
             Messages
           </Link>
-          <Link to="/peek" className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer">
+          <Link
+            to="/peek"
+            search={{ tab: "profile" }}
+            className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
+          >
             Profile
           </Link>
           <Link
@@ -323,14 +296,74 @@ export function MohallaRadarPage() {
         </nav>
 
         {/* Right Action CTA */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Link
             to="/lend"
-            className="btn-peek-sm"
+            className="btn-peek-sm cursor-pointer"
           >
             + LEND SOMETHING
           </Link>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden w-8 h-8 rounded-full bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer text-xs"
+            aria-label="Toggle Navigation Menu"
+          >
+            {mobileMenuOpen ? "✕" : "☰"}
+          </button>
         </div>
+
+        {/* Mobile Navigation Dropdown */}
+        {mobileMenuOpen && (
+          <div className="md:hidden absolute top-full left-0 right-0 z-50 bg-[#07080c]/98 backdrop-blur-2xl border-b border-neutral-800 p-4 flex flex-col gap-2 shadow-2xl">
+            <Link
+              to="/peek"
+              search={{ tab: "explore" }}
+              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Explore your Mohalla
+            </Link>
+            <Link
+              to="/peek"
+              search={{ tab: "stories" }}
+              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Mohalla Stories
+            </Link>
+            <Link
+              to="/recommendations"
+              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Recommendations
+            </Link>
+            <Link
+              to="/peek"
+              search={{ tab: "messages" }}
+              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Messages
+            </Link>
+            <Link
+              to="/peek"
+              search={{ tab: "profile" }}
+              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Profile
+            </Link>
+            <Link
+              to="/radar"
+              className="text-left text-xs font-mono py-2 px-3 rounded-lg bg-[#083842] text-teal-100 font-bold border border-neutral-700/60 transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Mohalla Radar
+            </Link>
+          </div>
+        )}
       </header>
 
       {/* 2. FULL SCREEN INTERACTIVE MAP AREA */}
@@ -343,7 +376,7 @@ export function MohallaRadarPage() {
         <div className="absolute top-5 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-3xl bg-[#0d0f17]/95 backdrop-blur-2xl border border-neutral-800/90 rounded-full p-2 sm:p-2.5 shadow-2xl flex items-center justify-between gap-3">
           
           {/* Search Input inside Floating Filter */}
-          <div className="relative flex-1 flex items-center ml-2">
+          <div className="relative flex-1 flex items-center ml-2 min-w-[80px]">
             <span className="text-neutral-400 mr-2 text-sm">🔍</span>
             <input
               type="text"
@@ -378,24 +411,30 @@ export function MohallaRadarPage() {
           </div>
         </div>
 
-        {/* BOTTOM LEFT LIVE STATUS BADGE */}
-        <div className="absolute bottom-6 left-6 z-30 bg-[#0d0f17]/95 backdrop-blur-xl border border-neutral-800/90 px-4 py-2.5 rounded-2xl flex items-center gap-3 shadow-2xl">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-          <div>
-            <span className="text-xs font-bold text-white block">Mohalla Live Geolocation Radar</span>
-            <span className="text-[10px] font-mono text-neutral-400">
-              {filteredItems.length} nearby items pinned within 500m radius
-            </span>
+        {/* BOTTOM CONTROLS: LIVE STATUS BADGE + QUICK BACK LINK (NON-OVERLAPPING) */}
+        <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6 z-30 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pointer-events-none">
+          {/* LIVE STATUS BADGE */}
+          <div className="pointer-events-auto bg-[#0d0f17]/95 backdrop-blur-xl border border-neutral-800/90 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl flex items-center gap-3 shadow-2xl">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+            <div>
+              <span className="text-xs font-bold text-white block">Mohalla Live Geolocation Radar</span>
+              <span className="text-[10px] font-mono text-neutral-400">
+                {filteredItems.length > 0
+                  ? `${filteredItems.length} nearby items pinned on Radar`
+                  : "0 nearby items on Radar · neighborhood shelves empty"}
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* BOTTOM RIGHT QUICK BACK TO STORE LINK */}
-        <Link
-          to="/peek"
-          className="absolute bottom-6 right-6 z-30 bg-neutral-950/95 backdrop-blur-xl border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-white text-xs font-mono px-4 py-2.5 rounded-2xl transition-all shadow-xl flex items-center gap-2 cursor-pointer"
-        >
-          <span>← Back to Vault Grid</span>
-        </Link>
+          {/* QUICK BACK TO STORE LINK */}
+          <Link
+            to="/peek"
+            search={{ tab: "explore" }}
+            className="pointer-events-auto bg-neutral-950/95 backdrop-blur-xl border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-white text-xs font-mono px-4 py-2.5 rounded-2xl transition-all shadow-xl flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          >
+            <span>← Back to Vault Grid</span>
+          </Link>
+        </div>
       </main>
     </div>
   );

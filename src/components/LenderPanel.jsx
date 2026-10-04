@@ -22,7 +22,8 @@ export default function LenderPanel({ currentUser, onAuthRequired }) {
       });
       if (res.ok) {
         const data = await res.json();
-        const customItems = (data.lent || []).map((item) => ({
+        const sourceList = (data.listings && data.listings.length > 0) ? data.listings : (data.lent || []);
+        const customItems = sourceList.map((item) => ({
           name: item.itemName,
           state: `${item.category || "Other"} · ready to share`,
           tilt: (Math.random() - 0.5) * 4,

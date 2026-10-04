@@ -1,6 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import AuthModal from "@/components/AuthModal";
+import {
+  getStoredUser,
+  setStoredUser,
+  clearSession,
+  isTokenValid,
+  AUTH_CHANGE_EVENT,
+  SESSION_EXPIRED_EVENT,
+  didSessionExpireOnStartup,
+  resetSessionExpiredOnStartupFlag,
+} from "@/lib/auth";
 
 export const Route = createFileRoute("/recommendations")({
   head: () => ({
@@ -31,21 +41,48 @@ export function RecommendationsPage() {
   const navigate = useNavigate();
 
   // User Auth state
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem("mohalla_user");
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-
+  const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authTriggerMsg, setAuthTriggerMsg] = useState("");
+  const [authInitialMode, setAuthInitialMode] = useState("login");
+
+  // Create Post Modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+
+  useEffect(() => {
+    if (didSessionExpireOnStartup()) {
+      resetSessionExpiredOnStartupFlag();
+      setAuthTriggerMsg("Your session has expired. Please log in again.");
+      setAuthInitialMode("login");
+      setShowAuthModal(true);
+    }
+
+    const handleAuthChange = (e) => {
+      setCurrentUser(e.detail || null);
+    };
+
+    const handleSessionExpired = (e) => {
+      setCurrentUser(null);
+      setShowCreateModal(false);
+      setAuthTriggerMsg("Your session has expired. Please log in again.");
+      setAuthInitialMode("login");
+      setShowAuthModal(true);
+    };
+
+    window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => {
+      window.removeEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    };
+  }, []);
 
   const requireAuth = (onSuccessCallback, msg) => {
-    if (!currentUser?.token) {
+    const user = getStoredUser();
+    if (!user || !user.token || !isTokenValid(user.token)) {
+      clearSession("expired");
       setAuthTriggerMsg(msg || "Sign in to ask your mohalla or share recommendations.");
+      setAuthInitialMode("login");
       setShowAuthModal(true);
       return false;
     }
@@ -72,8 +109,7 @@ export function RecommendationsPage() {
   const [recLocation, setRecLocation] = useState("");
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
 
-  // Create Post Modal state
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  // Create Post Modal form state
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState("Services");
   const [newDescription, setNewDescription] = useState("");
@@ -169,6 +205,14 @@ export function RecommendationsPage() {
         fetchPosts();
       } else {
         const txt = await res.text();
+        if (res.status === 401 || txt.includes("Unauthorized") || txt.includes("expired")) {
+          setShowCreateModal(false);
+          clearSession("expired");
+          setAuthTriggerMsg("Your session has expired. Please log in again.");
+          setAuthInitialMode("login");
+          setShowAuthModal(true);
+          return;
+        }
         setPostError(txt || "Failed to create post.");
       }
     } catch (err) {
@@ -216,6 +260,13 @@ export function RecommendationsPage() {
         fetchPosts();
       } else {
         const txt = await res.text();
+        if (res.status === 401 || txt.includes("Unauthorized") || txt.includes("expired")) {
+          clearSession("expired");
+          setAuthTriggerMsg("Your session has expired. Please log in again.");
+          setAuthInitialMode("login");
+          setShowAuthModal(true);
+          return;
+        }
         alert(txt || "Failed to post reply.");
       }
     } catch (err) {
@@ -242,6 +293,11 @@ export function RecommendationsPage() {
 
       if (res.ok) {
         openPostDetail(activePost.id);
+      } else if (res.status === 401) {
+        clearSession("expired");
+        setAuthTriggerMsg("Your session has expired. Please log in again.");
+        setAuthInitialMode("login");
+        setShowAuthModal(true);
       }
     } catch (err) {
       console.error(err);
@@ -265,6 +321,11 @@ export function RecommendationsPage() {
       if (res.ok) {
         if (activePost) openPostDetail(activePost.id);
         fetchPosts();
+      } else if (res.status === 401) {
+        clearSession("expired");
+        setAuthTriggerMsg("Your session has expired. Please log in again.");
+        setAuthInitialMode("login");
+        setShowAuthModal(true);
       }
     } catch (err) {
       console.error(err);
@@ -362,15 +423,26 @@ export function RecommendationsPage() {
         {/* Desktop Right Action CTA */}
         <div className="hidden md:flex items-center gap-3 shrink-0">
           {currentUser ? (
-            <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-neutral-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{currentUser.username}</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-neutral-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{currentUser.username}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => clearSession("logout")}
+                className="text-[11px] text-neutral-500 hover:text-red-400 font-mono transition-colors cursor-pointer px-1 py-1"
+                title="Sign Out"
+              >
+                Logout
+              </button>
             </div>
           ) : (
             <button
               type="button"
               onClick={() => {
                 setAuthTriggerMsg("Sign in to ask your mohalla or share recommendations.");
+                setAuthInitialMode("login");
                 setShowAuthModal(true);
               }}
               className="text-xs text-neutral-400 hover:text-white underline cursor-pointer px-2 py-1"
@@ -858,8 +930,8 @@ export function RecommendationsPage() {
 
       {/* 6. CREATE RECOMMENDATION POST MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-lg bg-[#111722] border border-neutral-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-[#111722] border border-neutral-800 rounded-3xl p-5 sm:p-8 space-y-6 shadow-2xl">
             
             <div className="flex items-center justify-between border-b border-neutral-800 pb-4">
               <div>
@@ -964,9 +1036,10 @@ export function RecommendationsPage() {
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        initialMode="register"
+        initialMode={authInitialMode}
         triggerMsg={authTriggerMsg}
         onSuccess={(userSession) => {
+          setStoredUser(userSession);
           setCurrentUser(userSession);
         }}
       />

@@ -37,7 +37,7 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpen
         }));
         
         setBorrowedItems(dbBorrowed);
-        setLentItems(data.lent || []);
+        setLentItems(data.listings && data.listings.length > 0 ? data.listings : (data.lent || []));
         setProfileMeta({
           fullName: data.fullName || currentUser?.username || "",
           bio: data.bio || "",
@@ -185,36 +185,40 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpen
             <span className="text-red-500 font-semibold">{borrowedItems.filter(b => b.daysLeft === 0).length} overdue</span>, <span className="text-yellow-400 font-semibold">{borrowedItems.length} total</span>
           </p>
 
-          <ul className="mt-7 space-y-6">
-            {borrowedItems.map((b) => (
-              <li key={b.id}>
-                <button
-                  type="button"
-                  onClick={() => setOpenId(b.id)}
-                  className="scatter-row w-full text-left"
-                >
-                  <span className="flex items-baseline justify-between gap-4">
-                    <span className="font-display text-2xl font-bold tracking-wide">{b.name}</span>
-                    <span
-                      className="font-mono text-[10px] font-light uppercase tracking-[0.28em]"
-                      style={{
-                        color:
-                          b.daysLeft === 0
-                            ? "oklch(0.72 0.18 30)"
-                            : "oklch(0.88 0.16 92)",
-                      }}
-                    >
-                      {b.daysLeft === 0 ? "due today" : `${b.daysLeft} days left`}
+          {borrowedItems.length === 0 ? (
+            <p className="mt-6 font-hand text-xl text-panel-note italic">No active borrowed items.</p>
+          ) : (
+            <ul className="mt-7 space-y-6">
+              {borrowedItems.map((b) => (
+                <li key={b.id}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(b.id)}
+                    className="scatter-row w-full text-left"
+                  >
+                    <span className="flex items-baseline justify-between gap-4">
+                      <span className="font-display text-2xl font-bold tracking-wide">{b.name}</span>
+                      <span
+                        className="font-mono text-[10px] font-light uppercase tracking-[0.28em]"
+                        style={{
+                          color:
+                            b.daysLeft === 0
+                              ? "oklch(0.72 0.18 30)"
+                              : "oklch(0.88 0.16 92)",
+                        }}
+                      >
+                        {b.daysLeft === 0 ? "due today" : `${b.daysLeft} days left`}
+                      </span>
                     </span>
-                  </span>
-                  <span className="font-mono text-[10px] font-light uppercase tracking-[0.28em] text-panel-note">
-                    {b.lender} · {b.since}
-                    {openId === b.id ? " · chatting" : ""}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+                    <span className="font-mono text-[10px] font-light uppercase tracking-[0.28em] text-panel-note">
+                      {b.lender} · {b.since}
+                      {openId === b.id ? " · chatting" : ""}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div>

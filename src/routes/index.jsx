@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import heroAsset from "@/assets/mohalla-hero.png";
 import TopAnnotations from "@/components/TopAnnotations";
 import PanelHeader from "@/components/PanelHeader";
@@ -7,6 +7,16 @@ import BorrowerPanel from "@/components/BorrowerPanel";
 import LenderPanel from "@/components/LenderPanel";
 import BorrowedProfile from "@/components/BorrowedProfile";
 import MohallaRadar from "@/components/MohallaRadar";
+import {
+  getStoredUser,
+  setStoredUser,
+  clearSession,
+  isTokenValid,
+  AUTH_CHANGE_EVENT,
+  SESSION_EXPIRED_EVENT,
+  didSessionExpireOnStartup,
+  resetSessionExpiredOnStartupFlag,
+} from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -48,33 +58,55 @@ function useScrollProgress() {
 }
 
 function Index() {
+  const navigate = useNavigate();
   const [mode, setMode] = useState("borrower");
   const [panelView, setPanelView] = useState("welcome");
   const p = useScrollProgress();
 
   // Authentication State
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const stored = localStorage.getItem("mohalla_user");
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
-
+  const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [activeTab, setActiveTab] = useState("content"); // "content" | "profile"
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
   const [authTriggerMsg, setAuthTriggerMsg] = useState("");
 
+  useEffect(() => {
+    if (didSessionExpireOnStartup()) {
+      resetSessionExpiredOnStartupFlag();
+      setAuthTriggerMsg("Your session has expired. Please log in again.");
+      setAuthMode("login");
+      setShowAuthModal(true);
+    }
+
+    const handleAuthChange = (e) => {
+      setCurrentUser(e.detail || null);
+    };
+
+    const handleSessionExpired = (e) => {
+      setCurrentUser(null);
+      setAuthTriggerMsg("Your session has expired. Please log in again.");
+      setAuthMode("login");
+      setShowAuthModal(true);
+    };
+
+    window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+    window.addEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    return () => {
+      window.removeEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
+      window.removeEventListener(SESSION_EXPIRED_EVENT, handleSessionExpired);
+    };
+  }, []);
+
   // Modal Inputs
   const [usernameValue, setUsernameValue] = useState("");
   const [passwordValue, setPasswordValue] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [phoneValue, setPhoneValue] = useState("");
   const [areaValue, setAreaValue] = useState("");
   const [shelfNameValue, setShelfNameValue] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [registeredToken, setRegisteredToken] = useState("");
 
   // Radar & Geolocation States
   const [locationSharingEnabled, setLocationSharingEnabled] = useState(false);
@@ -214,17 +246,27 @@ function Index() {
         if (authMode === "login") {
           const data = await res.json();
           const userSession = { username: data.username, token: data.token };
-          localStorage.setItem("mohalla_user", JSON.stringify(userSession));
+          setStoredUser(userSession);
           setCurrentUser(userSession);
           setShowAuthModal(false);
-          setActiveTab("content"); // Direct back to main panel view where they can search or toggle lender/borrower panels
+          setActiveTab("content");
+          setPanelView("active");
           setUsernameValue("");
           setPasswordValue("");
           setAuthTriggerMsg("");
+          navigate({ to: "/peek" });
         } else {
-          setSuccessMsg("Shelf created! Please customize your profile below.");
-          setAuthMode("setup");
+          const regData = await res.json();
+          const userSession = { username: regData.username || u, token: regData.token || "" };
+          setStoredUser(userSession);
+          setCurrentUser(userSession);
+          setShowAuthModal(false);
+          setActiveTab("content");
+          setPanelView("active");
+          setUsernameValue("");
           setPasswordValue("");
+          setAuthTriggerMsg("");
+          navigate({ to: "/peek" });
         }
       } else {
         const text = await res.text();
@@ -248,9 +290,13 @@ function Index() {
       return;
     }
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (registeredToken) {
+        headers["Authorization"] = `Bearer ${registeredToken}`;
+      }
       const res = await fetch("http://localhost:8085/api/setup_profile", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           username: usernameValue.trim(),
           phone,
@@ -260,13 +306,14 @@ function Index() {
       });
       if (res.ok) {
         // Log them in!
-        const userSession = { username: usernameValue.trim(), token: usernameValue.trim() };
-        localStorage.setItem("mohalla_user", JSON.stringify(userSession));
+        const userSession = { username: usernameValue.trim(), token: registeredToken || usernameValue.trim() };
+        setStoredUser(userSession);
         setCurrentUser(userSession);
 
-        // Close auth modal and redirect to homepage glass morphed area
+        // Close auth modal and bring user inside to /peek
         setShowAuthModal(false);
         setActiveTab("content");
+        setPanelView("active");
 
         // Clear values
         setUsernameValue("");
@@ -277,6 +324,7 @@ function Index() {
         setAuthTriggerMsg("");
         setErrorMsg("");
         setSuccessMsg("");
+        navigate({ to: "/peek" });
       } else {
         const text = await res.text();
         setErrorMsg(text || "Failed to setup profile details.");
@@ -354,17 +402,7 @@ function Index() {
                   <button
                     type="button"
                     onClick={() => {
-                      setActiveTab(activeTab === "profile" ? "content" : "profile");
-                      setPanelView("active");
-                    }}
-                    className="ink-link font-mono text-[10px] font-light uppercase tracking-[0.3em] border border-panel-line px-3 py-1 hover:border-white transition-colors"
-                  >
-                    {activeTab === "profile" ? "Search / Shelf" : "My Profile"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      localStorage.removeItem("mohalla_user");
+                      clearSession("logout");
                       setCurrentUser(null);
                       setActiveTab("content");
                       setPanelView("welcome");
@@ -536,14 +574,37 @@ function Index() {
                           password
                         </span>
                       </div>
-                      <input
-                        type="password"
-                        required
-                        placeholder="••••••••"
-                        value={passwordValue}
-                        onChange={(e) => setPasswordValue(e.target.value)}
-                        className="receipt-field"
-                      />
+                      <div className="relative flex items-center">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          placeholder="••••••••"
+                          value={passwordValue}
+                          onChange={(e) => setPasswordValue(e.target.value)}
+                          className="receipt-field pr-8"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute right-0 text-neutral-600 hover:text-neutral-900 transition-colors p-1 cursor-pointer focus:outline-none"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          title={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                              <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                              <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                              <line x1="2" x2="22" y1="2" y2="22" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="pt-2">
@@ -632,14 +693,37 @@ function Index() {
                           password
                         </span>
                       </div>
-                      <input
-                        type="password"
-                        required
-                        placeholder="••••••••"
-                        value={passwordValue}
-                        onChange={(e) => setPasswordValue(e.target.value)}
-                        className="receipt-field"
-                      />
+                      <div className="relative flex items-center">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          placeholder="••••••••"
+                          value={passwordValue}
+                          onChange={(e) => setPasswordValue(e.target.value)}
+                          className="receipt-field pr-8"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute right-0 text-neutral-600 hover:text-neutral-900 transition-colors p-1 cursor-pointer focus:outline-none"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          title={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                              <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                              <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                              <line x1="2" x2="22" y1="2" y2="22" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="pt-2">
