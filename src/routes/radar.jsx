@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import React, { useState, useEffect, useRef } from "react";
 import { apiUrl } from "@/lib/api";
+import { getStoredUser } from "@/lib/auth";
 
 export const Route = createFileRoute("/radar")({
   component: MohallaRadarPage,
@@ -15,18 +16,46 @@ export function MohallaRadarPage() {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersGroupRef = useRef(null);
+  const userMarkerRef = useRef(null);
+  const circle100Ref = useRef(null);
+  const circle250Ref = useRef(null);
+
   const [filterRadius, setFilterRadius] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [radarItems, setRadarItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Exact real coordinates (default: Ekta Square base coords)
+  const storedUser = typeof window !== "undefined" ? getStoredUser() : null;
+  const initialLat = storedUser?.latitude && storedUser.latitude !== 0 ? storedUser.latitude : 28.53139;
+  const initialLng = storedUser?.longitude && storedUser.longitude !== 0 ? storedUser.longitude : 77.25447;
+
+  const [centerLat, setCenterLat] = useState(initialLat);
+  const [centerLng, setCenterLng] = useState(initialLng);
+
+  // Request user high-accuracy geolocation on mount
+  useEffect(() => {
+    if (typeof window !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setCenterLat(pos.coords.latitude);
+          setCenterLng(pos.coords.longitude);
+        },
+        (err) => {
+          console.log("Using stored/default Mohalla coordinates:", err.message);
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      );
+    }
+  }, []);
+
   // Fetch real items from backend Radar API
   useEffect(() => {
     const fetchRadar = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(apiUrl("/api/radar/items?lat=28.5494&lng=77.2090&radius=10"));
+        const res = await fetch(apiUrl(`/api/radar/items?lat=${centerLat}&lng=${centerLng}&radius=50`));
         if (res.ok) {
           const data = await res.json();
           setRadarItems(Array.isArray(data) ? data : []);
@@ -41,7 +70,7 @@ export function MohallaRadarPage() {
       }
     };
     fetchRadar();
-  }, []);
+  }, [centerLat, centerLng]);
 
   const filteredItems = radarItems.filter((item) => {
     const title = item.itemName || item.title || "";
@@ -56,6 +85,8 @@ export function MohallaRadarPage() {
     const distMeters = (item.distanceKm || item.distanceKM || 0) * 1000;
     if (filterRadius === "100m") return distMeters <= 100;
     if (filterRadius === "250m") return distMeters <= 250;
+    if (filterRadius === "500m") return distMeters <= 500;
+    if (filterRadius === "5km") return distMeters <= 5000;
     if (filterRadius === "tools") return cat.toLowerCase().includes("tool");
     if (filterRadius === "electronics") return cat.toLowerCase().includes("electronic") || cat.toLowerCase().includes("gear");
     return true;
@@ -75,40 +106,19 @@ export function MohallaRadarPage() {
 
       const L = leafletModule.default || leafletModule;
 
-      const centerLat = 28.5494;
-      const centerLng = 77.2090;
-
       const map = L.map(mapContainerRef.current, {
         center: [centerLat, centerLng],
-        zoom: 16,
+        zoom: 15,
         zoomControl: false,
         attributionControl: false
       });
 
-      // 1. Dark Base Map with Light Grey Area Lines (roads, avenues, boundaries)
-      const cartoKey = import.meta.env.VITE_CARTO_API_KEY || import.meta.env.VITE_MAP_API_KEY || "";
-      const baseTileUrl = cartoKey
-        ? `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${cartoKey}`
-        : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
-      const labelsTileUrl = cartoKey
-        ? `https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png?key=${cartoKey}`
-        : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
-
-      L.tileLayer(baseTileUrl, {
+      // High-detail OpenStreetMap tile layer with full neighborhood boundaries, blocks, and street grids
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        subdomains: "abc",
         maxZoom: 19,
-        subdomains: cartoKey ? "abcd" : "",
         className: "mohalla-dark-map-base",
-        attribution: cartoKey
-          ? '&copy; OpenStreetMap contributors &copy; CARTO'
-          : '&copy; Esri, HERE, Garmin, OpenStreetMap contributors'
-      }).addTo(map);
-
-      // 2. Dedicated Map Labels Layer with Crisp Light Grey Area & Locality Text
-      L.tileLayer(labelsTileUrl, {
-        maxZoom: 19,
-        subdomains: cartoKey ? "abcd" : "",
-        className: "mohalla-dark-map-labels",
-        zIndex: 10
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
 
       // Custom Dark Teal User Pin
@@ -120,17 +130,17 @@ export function MohallaRadarPage() {
               📍
             </div>
             <div class="absolute -top-7 bg-neutral-900 text-neutral-200 font-mono text-[10px] px-2.5 py-0.5 rounded-full border border-neutral-700 whitespace-nowrap shadow-xl">
-              You (Block E)
+              You (Ekta Square)
             </div>
           </div>
         `,
         iconSize: [36, 36],
         iconAnchor: [18, 18],
       });
-      L.marker([centerLat, centerLng], { icon: userIcon }).addTo(map);
+      userMarkerRef.current = L.marker([centerLat, centerLng], { icon: userIcon }).addTo(map);
 
       // Concentric Radar Area Rings in Dark Grey Lines
-      L.circle([centerLat, centerLng], {
+      circle100Ref.current = L.circle([centerLat, centerLng], {
         radius: 100,
         color: "#4b5563",
         weight: 1.5,
@@ -139,7 +149,7 @@ export function MohallaRadarPage() {
         fillOpacity: 0.12
       }).addTo(map);
 
-      L.circle([centerLat, centerLng], {
+      circle250Ref.current = L.circle([centerLat, centerLng], {
         radius: 250,
         color: "#374151",
         weight: 1.5,
@@ -166,6 +176,44 @@ export function MohallaRadarPage() {
     };
   }, []);
 
+  // Dynamically synchronize User Pin and Radar Rings when live GPS updates
+  useEffect(() => {
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLatLng([centerLat, centerLng]);
+    }
+    if (circle100Ref.current) {
+      circle100Ref.current.setLatLng([centerLat, centerLng]);
+    }
+    if (circle250Ref.current) {
+      circle250Ref.current.setLatLng([centerLat, centerLng]);
+    }
+  }, [centerLat, centerLng]);
+
+  const handleRecenterGPS = () => {
+    if (typeof window !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setCenterLat(lat);
+          setCenterLng(lng);
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.flyTo([lat, lng], 16, { animate: true });
+          }
+        },
+        (err) => {
+          console.warn("GPS error:", err.message);
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.flyTo([centerLat, centerLng], 16, { animate: true });
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([centerLat, centerLng], 16, { animate: true });
+    }
+  };
+
   useEffect(() => {
     if (markersGroupRef.current) {
       const { L, markersGroup } = markersGroupRef.current;
@@ -190,16 +238,16 @@ export function MohallaRadarPage() {
         className: "custom-item-marker",
         html: `
           <div class="group relative cursor-pointer flex flex-col items-center select-none">
-            <div class="w-11 h-11 rounded-2xl bg-[#0d0f17] border border-neutral-700 shadow-2xl p-1 flex items-center justify-center transform transition-transform group-hover:scale-110">
+            <div class="w-12 h-12 rounded-2xl bg-[#0d0f17] border border-teal-500/50 shadow-2xl p-1 flex items-center justify-center transform transition-transform group-hover:scale-115">
               ${img ? `<img src="${img}" alt="${title}" class="w-full h-full object-contain rounded-xl" />` : `<span class="text-xl">📦</span>`}
             </div>
-            <div class="mt-1 bg-neutral-950/90 text-neutral-300 text-[10px] font-mono px-2 py-0.5 rounded-md border border-neutral-800 whitespace-nowrap shadow-md">
+            <div class="mt-1 bg-neutral-950/95 text-neutral-200 text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-neutral-700 whitespace-nowrap shadow-lg">
               ${title.split(' ')[0]} • ${distanceStr}
             </div>
           </div>
         `,
-        iconSize: [44, 60],
-        iconAnchor: [22, 30],
+        iconSize: [48, 64],
+        iconAnchor: [24, 32],
       });
 
       const popupContent = `
@@ -223,56 +271,75 @@ export function MohallaRadarPage() {
           className: "mohalla-dark-popup"
         });
     });
+
+    // Auto-fit bounds so all nearby items are framed on screen
+    if (items.length > 0 && mapInstanceRef.current) {
+      const validCoords = items
+        .filter((it) => (it.latitude || it.lat) && (it.longitude || it.lng))
+        .map((it) => [it.latitude || it.lat, it.longitude || it.lng]);
+      if (validCoords.length > 0) {
+        validCoords.push([centerLat, centerLng]);
+        const bounds = L.latLngBounds(validCoords);
+        mapInstanceRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 });
+      }
+    }
   };
 
   return (
     <div className="h-screen w-screen bg-[#07080c] text-white flex flex-col font-sans relative overflow-hidden">
-      {/* 1. TOP NAVBAR */}
-      <header className="sticky top-0 z-40 bg-[#07080c]/90 backdrop-blur-2xl border-b border-neutral-800/80 px-6 py-4 flex items-center justify-between shrink-0">
-        {/* Left Brand Logo in Hindi */}
+      {/* 1. TOP NAVBAR (Matching Panel Navbar Exactly) */}
+      <header className="sticky top-0 z-40 bg-[#141418]/95 backdrop-blur-xl border-b border-neutral-800/80 px-4 sm:px-10 md:px-12 py-3.5 sm:py-4 flex items-center justify-between shrink-0 shadow-sm">
+        {/* Brand Logo & Title */}
         <div className="flex items-center gap-3">
-          <Link to="/peek" search={{ tab: "explore" }} className="flex items-center gap-2.5 group cursor-pointer">
-            <span className="w-8 h-8 rounded-full bg-[#083842] border border-neutral-800 flex items-center justify-center font-bold text-teal-100 text-xs shadow-md">
-              म
-            </span>
-            <span className="font-extrabold text-base tracking-wide text-white group-hover:text-teal-200 transition-colors">
+          <Link
+            to="/peek"
+            search={{ tab: "explore", panel: "open" }}
+            className="flex items-center gap-2.5 sm:gap-3 group cursor-pointer"
+          >
+            <img
+              src="/favicon.png"
+              alt="Mohalla Store Logo"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-teal-500/30 object-contain shadow-sm group-hover:scale-105 transition-transform"
+            />
+            <span className="text-base sm:text-xl font-bold tracking-tight text-[#f5e6c8] group-hover:text-white transition-colors">
               मोहल्ला स्टोर
             </span>
           </Link>
         </div>
 
-        {/* Center Navbar Links */}
-        <nav className="hidden md:flex items-center gap-8 text-xs font-medium tracking-wide text-neutral-300">
+        {/* Center Navbar Links (Redirecting directly to specific panel sections) */}
+        <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-xs font-medium tracking-wide text-neutral-300">
           <Link
             to="/peek"
-            search={{ tab: "explore" }}
+            search={{ tab: "explore", panel: "open" }}
             className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
           >
             Explore your Mohalla
           </Link>
           <Link
             to="/peek"
-            search={{ tab: "stories" }}
+            search={{ tab: "stories", panel: "open" }}
             className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
           >
             Mohalla Stories
           </Link>
           <Link
-            to="/recommendations"
+            to="/peek"
+            search={{ tab: "recommendations", panel: "open" }}
             className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
           >
             Recommendations
           </Link>
           <Link
             to="/peek"
-            search={{ tab: "messages" }}
+            search={{ tab: "messages", panel: "open" }}
             className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
           >
             Messages
           </Link>
           <Link
             to="/peek"
-            search={{ tab: "profile" }}
+            search={{ tab: "profile", panel: "open" }}
             className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
           >
             Profile
@@ -288,7 +355,8 @@ export function MohallaRadarPage() {
         {/* Right Action CTA */}
         <div className="flex items-center gap-3">
           <Link
-            to="/lend"
+            to="/peek"
+            search={{ tab: "lend", panel: "open" }}
             className="btn-peek-sm px-3 py-1.5 sm:px-5 sm:py-2 tracking-wider sm:tracking-[0.2em] text-[11px] sm:text-[0.7rem] cursor-pointer"
           >
             + LEND SOMETHING
@@ -305,10 +373,10 @@ export function MohallaRadarPage() {
 
         {/* Mobile Navigation Dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-full left-0 right-0 z-50 bg-[#07080c]/98 backdrop-blur-2xl border-b border-neutral-800 p-4 flex flex-col gap-2 shadow-2xl">
+          <div className="md:hidden absolute top-full left-0 right-0 z-50 bg-[#141418]/98 backdrop-blur-2xl border-b border-neutral-800 p-4 flex flex-col gap-2 shadow-2xl">
             <Link
               to="/peek"
-              search={{ tab: "explore" }}
+              search={{ tab: "explore", panel: "open" }}
               className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -316,14 +384,15 @@ export function MohallaRadarPage() {
             </Link>
             <Link
               to="/peek"
-              search={{ tab: "stories" }}
+              search={{ tab: "stories", panel: "open" }}
               className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               Mohalla Stories
             </Link>
             <Link
-              to="/recommendations"
+              to="/peek"
+              search={{ tab: "recommendations", panel: "open" }}
               className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -331,7 +400,7 @@ export function MohallaRadarPage() {
             </Link>
             <Link
               to="/peek"
-              search={{ tab: "messages" }}
+              search={{ tab: "messages", panel: "open" }}
               className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -339,7 +408,7 @@ export function MohallaRadarPage() {
             </Link>
             <Link
               to="/peek"
-              search={{ tab: "profile" }}
+              search={{ tab: "profile", panel: "open" }}
               className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
@@ -347,7 +416,7 @@ export function MohallaRadarPage() {
             </Link>
             <Link
               to="/radar"
-              className="text-left text-xs font-mono py-2 px-3 rounded-lg bg-[#083842] text-teal-100 font-bold border border-neutral-700/60 transition-colors"
+              className="text-left text-xs font-mono py-2 px-3 rounded-lg bg-[#09414b] text-teal-100 font-bold border border-[#0c5360] transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               Mohalla Radar
@@ -357,10 +426,13 @@ export function MohallaRadarPage() {
       </header>
 
       {/* 2. FULL SCREEN INTERACTIVE MAP AREA */}
-      <main className="relative flex-1 w-full h-full">
+      <main className="relative flex-1 w-full h-full bg-[#07080c]">
         
         {/* MAP CANVAS */}
-        <div ref={mapContainerRef} className="w-full h-full z-0" />
+        <div ref={mapContainerRef} className="w-full h-full z-0 bg-[#07080c]" />
+
+        {/* Dark Atmosphere Vignette Overlay Layer */}
+        <div className="absolute inset-0 z-5 pointer-events-none bg-gradient-to-b from-[#07080c]/50 via-transparent to-[#07080c]/80 shadow-[inset_0_0_120px_rgba(0,0,0,0.9)]" />
 
         {/* TOP FLOATING MAP CONTROLS & FILTER BAR */}
         <div className="absolute top-5 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-3xl bg-[#0d0f17]/95 backdrop-blur-2xl border border-neutral-800/90 rounded-full p-2 sm:p-2.5 shadow-2xl flex items-center justify-between gap-3">
@@ -381,8 +453,8 @@ export function MohallaRadarPage() {
           <div className="flex items-center gap-1.5 overflow-x-auto shrink-0 pr-1">
             {[
               { key: "all", label: "All Radius" },
-              { key: "100m", label: "< 100m" },
-              { key: "250m", label: "< 250m" },
+              { key: "500m", label: "< 500m" },
+              { key: "5km", label: "< 5km" },
               { key: "tools", label: "Tools" },
               { key: "electronics", label: "Gear" }
             ].map((f) => (
@@ -399,6 +471,37 @@ export function MohallaRadarPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Floating Zoom & GPS Recenter Controls */}
+        <div className="absolute right-5 bottom-20 sm:bottom-24 z-30 flex flex-col gap-2 pointer-events-auto">
+          <button
+            type="button"
+            onClick={handleRecenterGPS}
+            className="w-10 h-10 rounded-xl bg-[#0d0f17]/95 hover:bg-[#182030] border border-neutral-700/80 text-amber-400 hover:text-amber-300 font-bold text-base flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer"
+            title="Snap to My Exact Live Location"
+            aria-label="Snap to My Exact Live Location"
+          >
+            ◎
+          </button>
+          <button
+            type="button"
+            onClick={() => mapInstanceRef.current?.zoomIn()}
+            className="w-10 h-10 rounded-xl bg-[#0d0f17]/95 hover:bg-[#182030] border border-neutral-700/80 text-white font-bold text-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer"
+            title="Zoom In"
+            aria-label="Zoom in on Mohalla map"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={() => mapInstanceRef.current?.zoomOut()}
+            className="w-10 h-10 rounded-xl bg-[#0d0f17]/95 hover:bg-[#182030] border border-neutral-700/80 text-white font-bold text-lg flex items-center justify-center shadow-2xl transition-all active:scale-95 cursor-pointer"
+            title="Zoom Out"
+            aria-label="Zoom out on Mohalla map"
+          >
+            −
+          </button>
         </div>
 
         {/* BOTTOM CONTROLS: LIVE STATUS BADGE + QUICK BACK LINK (NON-OVERLAPPING) */}

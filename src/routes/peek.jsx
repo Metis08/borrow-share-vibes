@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useLocation } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { LendPage } from "./lend";
 import MohallaRecommendationsView from "@/components/MohallaRecommendationsView";
 import MohallaStoriesView from "@/components/MohallaStoriesView";
@@ -34,6 +34,18 @@ function ItemPhoto({ src, alt, className }) {
     );
   }
   return <img src={src} alt={alt} className={className} />;
+}
+
+function formatLendDuration(dur) {
+  if (!dur) return "For 7 Days";
+  const clean = String(dur).trim();
+  if (/^for\s+/i.test(clean)) return clean;
+  if (/flexible/i.test(clean)) return "Flexible";
+  if (!isNaN(Date.parse(clean)) && clean.includes("-") && clean.length >= 8) {
+    const d = new Date(clean);
+    return `Till ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  }
+  return `For ${clean}`;
 }
 
 export const Route = createFileRoute("/peek")({
@@ -87,8 +99,66 @@ function RepositoryOfRemnantsPage() {
   }, []);
 
   const [activeItem, setActiveItem] = useState(null);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("panel") === "open") return true;
+      const t = params.get("tab");
+      if (t && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(t)) {
+        return true;
+      }
+    }
+    return false;
+  });
+  const [isAnimating, setIsAnimating] = useState(false);
+  const panelRef = useRef(null);
+
+  const handleOpenPanel = (tab = null) => {
+    if (tab) setActiveNavTab(tab);
+    setIsAnimating(true);
+    if (panelRef.current) {
+      const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+      const currentTransform = panelRef.current.style.transform;
+      if (!currentTransform || currentTransform === "none") {
+        panelRef.current.style.transform = `translateY(${vh - 40}px)`;
+      }
+      void panelRef.current.offsetHeight;
+      panelRef.current.style.transition = "transform 0.72s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.72s ease";
+      panelRef.current.style.transform = "translateY(0px)";
+    }
+    setTimeout(() => {
+      setPanelOpen(true);
+      setIsAnimating(false);
+      if (panelRef.current) {
+        panelRef.current.style.transition = "";
+        panelRef.current.style.transform = "";
+      }
+      document.body.style.overflow = "hidden";
+    }, 720);
+  };
+
+  const handleClosePanel = () => {
+    setIsAnimating(true);
+    if (panelRef.current) {
+      const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+      panelRef.current.style.transform = "translateY(0px)";
+      void panelRef.current.offsetHeight;
+      panelRef.current.style.transition = "transform 0.72s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.72s ease";
+      panelRef.current.style.transform = `translateY(${vh - 40}px)`;
+    }
+    setTimeout(() => {
+      setPanelOpen(false);
+      setIsAnimating(false);
+      if (panelRef.current) {
+        panelRef.current.style.transition = "";
+        panelRef.current.style.transform = "";
+        panelRef.current.scrollTop = 0;
+      }
+      document.body.style.overflow = "";
+      window.scrollTo(0, 0);
+    }, 720);
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeNavTab, setActiveNavTab] = useState(() => {
@@ -106,13 +176,12 @@ function RepositoryOfRemnantsPage() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const t = params.get("tab") || (location?.search && location.search.tab);
+      const isPanelOpenParam = params.get("panel") === "open" || (location?.search && location.search.panel === "open");
       if (t && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(t)) {
         setActiveNavTab(t);
-        if (t !== "explore") {
-          setTimeout(() => {
-            document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-          }, 150);
-        }
+        setPanelOpen(true);
+      } else if (isPanelOpenParam) {
+        setPanelOpen(true);
       }
     }
   }, [location?.search, location?.searchStr, location?.href]);
@@ -135,10 +204,10 @@ function RepositoryOfRemnantsPage() {
             const area = item.area || "Nearby";
             const image = resolveItemImage(item);
             mapped[key] = {
-              id: `LEND-${item.id}`,
+              id: item.id,
               realId: item.id,
               title: title,
-              code: `LEND-${item.id}`,
+              code: item.id,
               owner: owner,
               rawUsername: item.username || owner,
               distance: area,
@@ -242,7 +311,6 @@ function RepositoryOfRemnantsPage() {
   // Authentication & Profile Modals
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Real Profile State
   const [profileData, setProfileData] = useState(null);
@@ -590,18 +658,86 @@ function RepositoryOfRemnantsPage() {
     }
   };
 
-  // Track window scroll to slide up glassmorphed panel
+  // Continuously sync panel rise with natural scroll until it reaches the extreme top and sticks
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 60) {
-        setIsScrolled(true);
+    if (panelOpen || isAnimating) {
+      if (panelOpen) {
+        document.body.style.overflow = "hidden";
+        if (panelRef.current) {
+          panelRef.current.style.transform = "translateY(0px)";
+          panelRef.current.style.transition = "";
+        }
+      }
+      return;
+    }
+
+    document.body.style.overflow = "";
+
+    const updatePanelPosition = () => {
+      if (!panelRef.current || panelOpen || isAnimating) return;
+      const scrollY = window.scrollY;
+      const vh = window.innerHeight || 800;
+      const progress = Math.min(1, Math.max(0, scrollY / vh));
+
+      if (progress >= 0.98) {
+        // Reached the extreme top -> STICK!
+        setPanelOpen(true);
+        panelRef.current.style.transform = "translateY(0px)";
+        panelRef.current.style.transition = "";
+        document.body.style.overflow = "hidden";
       } else {
-        setIsScrolled(false);
+        // Rises proportionally with scroll (leaves ~2.5rem / 40px peek at scroll 0)
+        const peekOffset = 40;
+        const remainingDist = (vh - peekOffset) * (1 - progress);
+        panelRef.current.style.transform = `translateY(${remainingDist}px)`;
+        panelRef.current.style.transition = "none";
       }
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+
+    updatePanelPosition();
+
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          updatePanelPosition();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
+  }, [panelOpen, isAnimating]);
+
+  // Lock body overflow when panel is stuck at top
+  useEffect(() => {
+    if (panelOpen) {
+      document.body.style.overflow = "hidden";
+    } else if (!isAnimating) {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [panelOpen, isAnimating]);
+
+  // Pressing Escape smoothly closes the panel if open and no child modals are active
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape" && panelOpen && !borrowingItemKey && !showAuthModal && !showEditProfileModal && !showFlyer) {
+        handleClosePanel();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [panelOpen, borrowingItemKey, showAuthModal, showEditProfileModal, showFlyer]);
 
   const itemDetails = dbItems;
 
@@ -620,7 +756,7 @@ function RepositoryOfRemnantsPage() {
     } else if (keys.length > 0) {
       setActiveItem(keys[0]);
     }
-    document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
+    handleOpenPanel("explore");
   };
 
   const categories = ["All", "Electronics & Gear", "Tools & Repair", "Books & Games", "Household", "Other"];
@@ -643,8 +779,6 @@ function RepositoryOfRemnantsPage() {
       (item.distance && item.distance.toLowerCase().includes(q));
     return matchesCategory && matchesSearch;
   });
-
-  const showPanel = isScrolled || panelOpen;
 
   return (
     <main className="w-full bg-[#121212] text-[#e0e0e0] font-sans antialiased selection:bg-[#ffff00] selection:text-black relative">
@@ -671,84 +805,15 @@ function RepositoryOfRemnantsPage() {
             </span>
           </Link>
 
-          {/* Center Navigation Options (Desktop) */}
-          <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-xs font-medium tracking-wide text-neutral-300">
-            <button
-              onClick={() => {
-                setActiveNavTab("explore");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
-                activeNavTab === "explore" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
-              }`}
-            >
-              Explore your Mohalla
-            </button>
-            <button
-              onClick={() => {
-                setActiveNavTab("stories");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
-                activeNavTab === "stories" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
-              }`}
-            >
-              Mohalla Stories
-            </button>
-            <button
-              onClick={() => {
-                setActiveNavTab("recommendations");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
-                activeNavTab === "recommendations" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
-              }`}
-            >
-              Recommendations
-            </button>
-            <button
-              onClick={() => {
-                setActiveNavTab("messages");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
-                activeNavTab === "messages" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
-              }`}
-            >
-              Messages
-            </button>
-            <button
-              onClick={() => {
-                setActiveNavTab("profile");
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer ${
-                activeNavTab === "profile" ? "text-[#facc15] font-semibold underline underline-offset-4 decoration-[#facc15]" : ""
-              }`}
-            >
-              Profile
-            </button>
-            <Link
-              to="/radar"
-              className="hover:text-[#facc15] hover:underline hover:underline-offset-4 hover:decoration-[#facc15] transition-all cursor-pointer"
-            >
-              Mohalla Radar
-            </Link>
-          </nav>
-
-          {/* Right CTA Button: + Lend Something + Mobile Menu Toggle */}
+          {/* Right CTA Button: LOOKING FOR SOMETHING (All Screen Types: Phone, iPad, Desktop) */}
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="relative group/lend">
               <button
                 type="button"
-                onClick={() => {
-                  setActiveNavTab("lend");
-                  setPanelOpen(true);
-                  document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className="btn-peek-sm px-3 py-1.5 sm:px-5 sm:py-2 tracking-wider sm:tracking-[0.2em] text-[11px] sm:text-[0.7rem] cursor-pointer"
+                onClick={() => handleOpenPanel("explore")}
+                className="btn-peek-sm px-3.5 py-1.5 sm:px-5 sm:py-2 tracking-wider sm:tracking-[0.18em] text-[10px] sm:text-[0.7rem] cursor-pointer whitespace-nowrap"
               >
-                + LEND SOMETHING
+                LOOKING FOR SOMETHING
               </button>
               
               {/* Hanging Nimbu Mirchi Totem */}
@@ -760,90 +825,7 @@ function RepositoryOfRemnantsPage() {
                 />
               </div>
             </div>
-
-            {/* Mobile Hamburger Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden w-8 h-8 rounded-full bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer text-xs shrink-0"
-              aria-label="Toggle Navigation Menu"
-            >
-              {mobileMenuOpen ? "✕" : "☰"}
-            </button>
           </div>
-
-          {/* Mobile Navigation Dropdown Menu */}
-          {mobileMenuOpen && (
-            <div className="md:hidden absolute top-full left-0 right-0 z-50 bg-[#141418]/98 backdrop-blur-2xl border-b border-neutral-800 p-4 flex flex-col gap-2 shadow-2xl">
-              <button
-                onClick={() => {
-                  setActiveNavTab("explore");
-                  setMobileMenuOpen(false);
-                  document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className={`text-left text-xs font-mono py-2 px-3 rounded-lg transition-colors cursor-pointer ${
-                  activeNavTab === "explore" ? "bg-[#facc15]/10 text-[#facc15] font-bold" : "text-neutral-300 hover:bg-neutral-800"
-                }`}
-              >
-                Explore your Mohalla
-              </button>
-              <button
-                onClick={() => {
-                  setActiveNavTab("stories");
-                  setMobileMenuOpen(false);
-                  document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className={`text-left text-xs font-mono py-2 px-3 rounded-lg transition-colors cursor-pointer ${
-                  activeNavTab === "stories" ? "bg-[#facc15]/10 text-[#facc15] font-bold" : "text-neutral-300 hover:bg-neutral-800"
-                }`}
-              >
-                Mohalla Stories
-              </button>
-              <button
-                onClick={() => {
-                  setActiveNavTab("recommendations");
-                  setMobileMenuOpen(false);
-                  document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className={`text-left text-xs font-mono py-2 px-3 rounded-lg transition-colors cursor-pointer ${
-                  activeNavTab === "recommendations" ? "bg-[#facc15]/10 text-[#facc15] font-bold" : "text-neutral-300 hover:bg-neutral-800"
-                }`}
-              >
-                Recommendations
-              </button>
-              <button
-                onClick={() => {
-                  setActiveNavTab("messages");
-                  setMobileMenuOpen(false);
-                  document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className={`text-left text-xs font-mono py-2 px-3 rounded-lg transition-colors cursor-pointer ${
-                  activeNavTab === "messages" ? "bg-[#facc15]/10 text-[#facc15] font-bold" : "text-neutral-300 hover:bg-neutral-800"
-                }`}
-              >
-                Messages
-              </button>
-              <button
-                onClick={() => {
-                  setActiveNavTab("profile");
-                  setMobileMenuOpen(false);
-                  document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-                }}
-                className={`text-left text-xs font-mono py-2 px-3 rounded-lg transition-colors cursor-pointer ${
-                  activeNavTab === "profile" ? "bg-[#facc15]/10 text-[#facc15] font-bold" : "text-neutral-300 hover:bg-neutral-800"
-                }`}
-              >
-                Profile
-              </button>
-              <Link
-                to="/radar"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors cursor-pointer"
-              >
-                Mohalla Radar ↗
-              </Link>
-            </div>
-          )}
         </header>
 
         {/* 2. HERO ARCHIVAL HEADER */}
@@ -1070,9 +1052,7 @@ function RepositoryOfRemnantsPage() {
           {/* BOTTOM SCROLL PROMPT BUTTON */}
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center">
             <button
-              onClick={() => {
-                document.getElementById("glass-vault-panel")?.scrollIntoView({ behavior: "smooth" });
-              }}
+              onClick={() => handleOpenPanel("explore")}
               className="bg-[#1e1e24]/90 hover:bg-[#2a2a32] text-neutral-300 hover:text-white px-5 py-2 rounded-full text-xs font-mono border border-neutral-700/60 backdrop-blur-md shadow-xl flex items-center gap-2 transition-all cursor-pointer group"
             >
               <span>Scroll down to explore Glassmorphic Vault</span>
@@ -1092,15 +1072,30 @@ function RepositoryOfRemnantsPage() {
 
       </div>
 
+      {/* Scroll track spacer: allows natural 100vh scroll travel so panel rises smoothly with scroll */}
+      {!panelOpen && (
+        <div className="w-full h-screen pointer-events-none select-none" aria-hidden="true" />
+      )}
+
       {/* 4. OVERLAPPING GLASSMORPHIC PANEL SLIDING FROM BOTTOM ON SCROLL */}
       <section
         id="glass-vault-panel"
-        className="relative z-20 w-full min-h-screen bg-[#141418] border-t border-neutral-700/60 rounded-t-[2.5rem] shadow-[0_-30px_100px_rgba(0,0,0,0.95)] p-4 sm:p-10 md:p-12 font-sans -mt-6"
+        ref={panelRef}
+        onClick={() => {
+          if (!panelOpen) handleOpenPanel();
+        }}
+        className={`fixed inset-0 z-30 w-full h-[100dvh] bg-[#141418] border-t border-neutral-700/60 rounded-t-[2.5rem] shadow-[0_-30px_100px_rgba(0,0,0,0.95)] pt-0 px-4 sm:px-10 md:px-12 pb-8 sm:pb-12 font-sans vault-panel-sheet ${
+          isAnimating ? "is-animating" : ""
+        } ${
+          panelOpen
+            ? "panel-open overflow-y-auto pointer-events-auto"
+            : "panel-closed overflow-hidden pointer-events-auto cursor-pointer"
+        }`}
       >
         {/* Screen-Wide Glassmorphic Container Backdrop */}
         <div className="w-full max-w-[1380px] mx-auto flex flex-col gap-6">
             {/* Top Glass Navbar Header inside Panel - STICKY AT TOP */}
-            <div className="sticky top-0 z-40 bg-[#141418]/95 backdrop-blur-xl border-b border-neutral-800/80 pb-3 pt-2 flex flex-col -mx-4 sm:-mx-10 md:-mx-12 px-4 sm:px-10 md:px-12 -mt-4 sm:-mt-10 md:-mt-12 rounded-t-[2.5rem] gap-2">
+            <div className="sticky top-0 z-40 bg-[#141418]/95 backdrop-blur-xl border-b border-neutral-800/80 pt-4 sm:pt-5 pb-3.5 sm:pb-4 flex flex-col -mx-4 sm:-mx-10 md:-mx-12 px-4 sm:px-10 md:px-12 rounded-t-[2.5rem] gap-2 shadow-sm">
               <div className="flex items-center justify-between w-full">
                 {/* Brand Title */}
                 <Link
@@ -1182,9 +1177,14 @@ function RepositoryOfRemnantsPage() {
                   </button>
 
                   <button
-                    onClick={() => setPanelOpen(false)}
-                    className="w-8 h-8 rounded-full bg-neutral-800/80 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer text-sm font-semibold shrink-0"
-                    title="Close Panel"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClosePanel();
+                    }}
+                    className="w-8 h-8 rounded-full bg-neutral-800/80 hover:bg-neutral-700 active:scale-95 text-neutral-400 hover:text-white flex items-center justify-center transition-all cursor-pointer text-sm font-semibold shrink-0"
+                    title="Close and view showcase"
+                    aria-label="Close vault panel"
                   >
                     ✕
                   </button>
@@ -2116,10 +2116,7 @@ function RepositoryOfRemnantsPage() {
                       <div className="bg-neutral-900/90 border border-neutral-800 rounded-[2.5rem] p-6 sm:p-8 flex flex-col justify-between items-center relative overflow-hidden backdrop-blur-2xl shadow-2xl h-full min-h-[300px] md:min-h-[560px] lg:min-h-[620px]">
                         
                         {/* Top Bar inside Left Card */}
-                        <div className="w-full flex items-center justify-between z-10">
-                          <span className="hidden md:inline-block font-mono text-xs text-teal-200 uppercase tracking-widest bg-[#09414b]/30 px-3 py-1 rounded-full border border-[#0c5360]/50">
-                            {itemDetails[borrowingItemKey].code}
-                          </span>
+                        <div className="w-full flex items-center justify-end z-10">
                           <span className="text-xs font-mono text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
                             {itemDetails[borrowingItemKey].status}
                           </span>
@@ -2140,9 +2137,14 @@ function RepositoryOfRemnantsPage() {
                             <span className="text-xs text-neutral-400 font-mono block">Lender & Location</span>
                             <span className="text-sm font-bold text-white">{itemDetails[borrowingItemKey].owner}</span>
                           </div>
-                          <span className="text-xs font-mono text-teal-200 bg-[#083842] px-3 py-1 rounded-full border border-[#09414b]">
-                            {itemDetails[borrowingItemKey].distance}
-                          </span>
+                          <div className="text-right flex flex-col items-end">
+                            <span className="text-[10px] font-mono text-teal-300 font-medium mb-0.5">
+                              {formatLendDuration(itemDetails[borrowingItemKey].duration)}
+                            </span>
+                            <span className="text-xs font-mono text-teal-200 bg-[#083842] px-2.5 py-0.5 rounded-full border border-[#09414b]">
+                              {itemDetails[borrowingItemKey].distance || itemDetails[borrowingItemKey].area || "Nearby"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2337,7 +2339,7 @@ function RepositoryOfRemnantsPage() {
               <>
                 {/* Selected Item Spotlight Banner */}
                 {activeItem && itemDetails[activeItem] && (
-                  <div className="hidden md:flex bg-gradient-to-r from-neutral-800/60 via-neutral-900/50 to-neutral-800/60 border border-neutral-700/50 rounded-2xl p-6 flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-xl">
+                  <div className="hidden md:flex bg-gradient-to-r from-neutral-800/60 via-neutral-900/50 to-neutral-800/60 border border-neutral-700/50 rounded-2xl p-6 flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-xl mt-2 sm:mt-3 relative z-10 shadow-lg">
                     <div className="flex items-center gap-6">
                       <div className="w-24 h-24 bg-neutral-950/80 rounded-xl p-3 border border-neutral-800 flex items-center justify-center shrink-0">
                         <ItemPhoto
@@ -2347,11 +2349,11 @@ function RepositoryOfRemnantsPage() {
                         />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="font-mono text-[10px] text-teal-200 bg-[#09414b]/40 px-2 py-0.5 rounded border border-[#0c5360]">
-                            {itemDetails[activeItem].id}
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span className="text-xs text-neutral-400 font-medium">{itemDetails[activeItem].owner} ({itemDetails[activeItem].distance || itemDetails[activeItem].area || "Nearby"})</span>
+                          <span className="text-teal-300 font-mono text-[11px] font-medium bg-[#09414b]/30 px-2 py-0.5 rounded border border-[#0c5360]/40">
+                            {formatLendDuration(itemDetails[activeItem].duration)}
                           </span>
-                          <span className="text-xs text-neutral-400">{itemDetails[activeItem].owner} ({itemDetails[activeItem].distance})</span>
                         </div>
                         <h3 className="text-xl font-bold text-white">{itemDetails[activeItem].title}</h3>
                         <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
@@ -2473,8 +2475,7 @@ function RepositoryOfRemnantsPage() {
                         }`}
                       >
                         {/* Status Badge */}
-                        <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400 mb-3">
-                          <span className="text-neutral-500">{item.code}</span>
+                        <div className="flex items-center justify-end text-[10px] font-mono text-neutral-400 mb-3">
                           <span className="text-emerald-400 bg-emerald-400/10 px-2.5 py-0.5 rounded-full border border-emerald-400/20">
                             {item.status}
                           </span>
@@ -2494,9 +2495,16 @@ function RepositoryOfRemnantsPage() {
                           <h4 className="text-sm font-semibold text-white group-hover:text-teal-200 transition-colors line-clamp-1">
                             {item.title}
                           </h4>
-                          <div className="flex items-center justify-between text-xs text-neutral-400 mt-1.5">
-                            <span>{item.owner}</span>
-                            <span className="font-mono text-neutral-500 text-[11px]">{item.distance}</span>
+                          <div className="flex items-end justify-between text-xs text-neutral-400 mt-2 gap-2">
+                            <span className="truncate max-w-[48%]">{item.owner}</span>
+                            <div className="text-right flex flex-col items-end shrink-0">
+                              <span className="font-mono text-teal-300 text-[10px] font-medium leading-tight">
+                                {formatLendDuration(item.duration)}
+                              </span>
+                              <span className="font-mono text-neutral-500 text-[11px] leading-tight mt-0.5">
+                                {item.distance || item.area || "Nearby"}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>

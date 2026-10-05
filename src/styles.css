@@ -459,18 +459,18 @@
   background-color: #07080c !important;
 }
 
-/* Base lines layer: Streets, avenues, boundaries in dark grey */
+/* Base map layer: High-contrast Dark theme with full boundary lines, streets, and area grids */
 .mohalla-dark-map-base,
 .mohalla-dark-teal-glass-map-tiles,
 .grey-map-base {
-  filter: grayscale(100%) brightness(85%) contrast(115%) !important;
+  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7) !important;
 }
 
-/* Area text labels layer: Locality names, neighborhoods, and area names in dark grey */
+/* Area text labels layer */
 .mohalla-dark-map-labels,
 .teal-map-labels {
-  filter: grayscale(100%) brightness(65%) contrast(125%) !important;
-  opacity: 0.82 !important;
+  filter: brightness(1.2) contrast(1.1) !important;
+  opacity: 0.95 !important;
 }
 
 /* Glassmorphic editorial zoom control elements */
@@ -669,3 +669,23 @@ html, body {
     display: none !important;
   }
 }
+
+/* --- Glassmorphic Vault Panel Sheet Transition (Smooth Scroll & Dismiss) --- */
+.vault-panel-sheet {
+  will-change: transform;
+}
+
+.vault-panel-sheet.is-animating {
+  transition: transform 0.72s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.72s ease;
+}
+
+.vault-panel-sheet.panel-open {
+  transform: translateY(0) !important;
+}
+
+.vault-panel-sheet.panel-closed {
+  transform: translateY(calc(100vh - 2.5rem));
+  transform: translateY(calc(100dvh - 2.5rem));
+}
+
+

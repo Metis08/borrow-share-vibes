@@ -2228,13 +2228,8 @@ func haversine(lat1, lon1, lat2, lon2 float64) float64 {
 }
 
 func deterministicFuzz(val float64, username string) float64 {
-	var sum int
-	for _, char := range username {
-		sum += int(char)
-	}
-	// Shift by a constant small offset (up to ~0.001 degrees, approx 110m)
-	offset := (float64(sum%200) - 100) / 100000.0
-	return val + offset
+	// Return exact coordinate without artificial offset shifts
+	return val
 }
 
 func radarItemsHandler(w http.ResponseWriter, r *http.Request) {
@@ -2273,11 +2268,15 @@ func radarItemsHandler(w http.ResponseWriter, r *http.Request) {
 		lng = 77.2167 // Default center
 	}
 
-	radius := 5.0
+	radius := 50.0
 	if radiusStr != "" {
-		rVal, err := strconv.ParseFloat(radiusStr, 64)
-		if err == nil {
-			radius = rVal
+		if strings.EqualFold(radiusStr, "all") || radiusStr == "0" {
+			radius = 500.0
+		} else {
+			rVal, err := strconv.ParseFloat(radiusStr, 64)
+			if err == nil && rVal > 0 {
+				radius = rVal
+			}
 		}
 	}
 

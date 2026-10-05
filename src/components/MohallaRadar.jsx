@@ -172,12 +172,12 @@ export default function MohallaRadar({
 
   // Location settings
   const [locationSharingEnabled, setLocationSharingEnabled] = useState(initialLocationSharing || false);
-  const [centerLat, setCenterLat] = useState(initialLat || 28.6448);
-  const [centerLng, setCenterLng] = useState(initialLng || 77.2167);
+  const [centerLat, setCenterLat] = useState(initialLat || 28.53139);
+  const [centerLng, setCenterLng] = useState(initialLng || 77.25447);
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState("");
-  const [radiusKm, setRadiusKm] = useState(5.0);
+  const [radiusKm, setRadiusKm] = useState(50.0);
   const [category, setCategory] = useState("All");
   const [sortOrder, setSortOrder] = useState("nearest");
 
@@ -230,7 +230,8 @@ export default function MohallaRadar({
         },
         (error) => {
           console.error("Auto-location fetch on mount failed/denied:", error);
-        }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
   }, [initialLat, initialLng, currentUser]);
@@ -240,7 +241,7 @@ export default function MohallaRadar({
     if (selectedItemFromParent && selectedItemFromParent.latitude && selectedItemFromParent.longitude) {
       setSelectedRadarItem(selectedItemFromParent);
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.flyTo({ center: [selectedItemFromParent.longitude, selectedItemFromParent.latitude], zoom: 16.5, pitch: 60 });
+        mapInstanceRef.current.flyTo([selectedItemFromParent.latitude, selectedItemFromParent.longitude], 16.5);
       }
     }
   }, [selectedItemFromParent]);
@@ -408,35 +409,17 @@ export default function MohallaRadar({
     });
     mapInstanceRef.current = map;
 
-    // 1. Dark Base Map with Dark Grey Area Lines (roads, avenues, boundaries)
-    const cartoKey = import.meta.env.VITE_CARTO_API_KEY || import.meta.env.VITE_MAP_API_KEY || "";
-    const baseTileUrl = cartoKey
-      ? `https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png?key=${cartoKey}`
-      : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
-    const labelsTileUrl = cartoKey
-      ? `https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png?key=${cartoKey}`
-      : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}";
-
-    L.tileLayer(baseTileUrl, {
-      maxZoom: 20,
-      subdomains: cartoKey ? "abcd" : "",
+    // High-detail OpenStreetMap tile layer with full neighborhood boundaries, blocks, and street grids
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      subdomains: "abc",
+      maxZoom: 19,
       className: "mohalla-dark-map-base",
-      attribution: cartoKey
-        ? '&copy; OpenStreetMap contributors &copy; CARTO'
-        : '&copy; Esri, HERE, Garmin, OpenStreetMap contributors'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     // 2. 3D Extruded Building Layer
     const buildingCanvas = create3dBuildingCanvasLayer(L, centerLat, centerLng);
     buildingCanvas.addTo(map);
-
-    // 3. Dedicated Map Labels Layer with Dark Grey Area & Locality Names
-    L.tileLayer(labelsTileUrl, {
-      maxZoom: 20,
-      subdomains: cartoKey ? "abcd" : "",
-      className: "mohalla-dark-map-labels",
-      zIndex: 10
-    }).addTo(map);
 
     const group = L.layerGroup().addTo(map);
     markersGroupRef.current = group;
@@ -538,6 +521,18 @@ export default function MohallaRadar({
         setSelectedRadarItem(item);
       });
     });
+
+    // Auto-fit bounds so all nearby items are framed on screen
+    if (items.length > 0 && mapInstanceRef.current) {
+      const validPoints = items
+        .filter((it) => it.latitude && it.longitude)
+        .map((it) => [it.latitude, it.longitude]);
+      if (validPoints.length > 0) {
+        validPoints.push([centerLat, centerLng]);
+        const bounds = L.latLngBounds(validPoints);
+        mapInstanceRef.current.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 });
+      }
+    }
   }, [L, items, locationSharingEnabled, centerLat, centerLng]);
 
   return (
@@ -617,7 +612,7 @@ export default function MohallaRadar({
               {locationSharingEnabled ? (
                 <div className="flex items-center gap-4">
                   <span className="font-mono text-[10px] sm:text-xs text-green-400 uppercase tracking-wider pb-1 border-b border-green-500/20">
-                    📡 Sharing (Fuzzed: ~100m shifted)
+                    📡 Sharing (Live Location)
                   </span>
                   <button
                     type="button"
