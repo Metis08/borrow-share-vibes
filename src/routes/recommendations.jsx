@@ -51,23 +51,13 @@ export function RecommendationsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
-    if (didSessionExpireOnStartup()) {
-      resetSessionExpiredOnStartupFlag();
-      setAuthTriggerMsg("Your session has expired. Please log in again.");
-      setAuthInitialMode("login");
-      setShowAuthModal(true);
-    }
-
     const handleAuthChange = (e) => {
       setCurrentUser(e.detail || null);
     };
 
-    const handleSessionExpired = (e) => {
+    const handleSessionExpired = () => {
       setCurrentUser(null);
       setShowCreateModal(false);
-      setAuthTriggerMsg("Your session has expired. Please log in again.");
-      setAuthInitialMode("login");
-      setShowAuthModal(true);
     };
 
     window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);

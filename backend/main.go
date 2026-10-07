@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -161,46 +162,50 @@ type BorrowedItem struct {
 }
 
 type LentItem struct {
-	ID          interface{} `json:"id"`
-	Username    string      `json:"username"`
-	UserID      interface{} `json:"userId,omitempty"`
-	ItemName    string      `json:"itemName"`
-	ItemNameAlt string      `json:"item_name,omitempty"`
-	Status      string      `json:"status"`
-	Category    string      `json:"category"`
-	Description string      `json:"description"`
-	LenderName  string      `json:"lenderName"`
-	Area        string      `json:"area"`
-	Phone       string      `json:"phone"`
-	Duration    string      `json:"duration"`
-	Condition   string      `json:"condition"`
-	ImageUrl    string      `json:"imageUrl"`
-	Latitude    float64     `json:"latitude,omitempty"`
-	Longitude   float64     `json:"longitude,omitempty"`
-	CreatedAt   string      `json:"createdAt"`
-	UpdatedAt   string      `json:"updatedAt,omitempty"`
+	ID             interface{} `json:"id"`
+	Username       string      `json:"username"`
+	UserID         interface{} `json:"userId,omitempty"`
+	ItemName       string      `json:"itemName"`
+	ItemNameAlt    string      `json:"item_name,omitempty"`
+	Status         string      `json:"status"`
+	Category       string      `json:"category"`
+	Description    string      `json:"description"`
+	LenderName     string      `json:"lenderName"`
+	Area           string      `json:"area"`
+	Phone          string      `json:"phone"`
+	Duration       string      `json:"duration"`
+	Condition      string      `json:"condition"`
+	ImageUrl       string      `json:"imageUrl"`
+	Latitude       float64     `json:"latitude,omitempty"`
+	Longitude      float64     `json:"longitude,omitempty"`
+	AvailableFrom  string      `json:"availableFrom,omitempty"`
+	AvailableUntil string      `json:"availableUntil,omitempty"`
+	CreatedAt      string      `json:"createdAt"`
+	UpdatedAt      string      `json:"updatedAt,omitempty"`
 }
 
 type FirestoreItem struct {
-	ID           string    `firestore:"id" json:"id"`
-	UserID       string    `firestore:"userId" json:"userId"`
-	Username     string    `firestore:"username" json:"username"`
-	LenderName   string    `firestore:"lenderName" json:"lenderName"`
-	ItemName     string    `firestore:"itemName" json:"itemName"`
-	ItemNameAlt  string    `firestore:"-" json:"item_name,omitempty"`
-	Description  string    `firestore:"description" json:"description"`
-	Category     string    `firestore:"category" json:"category"`
-	Condition    string    `firestore:"condition" json:"condition"`
-	Availability string    `firestore:"availability" json:"availability"`
-	Status       string    `firestore:"status" json:"status"`
-	Area         string    `firestore:"area" json:"area"`
-	Phone        string    `firestore:"phone" json:"phone"`
-	Duration     string    `firestore:"duration" json:"duration"`
-	Latitude     float64   `firestore:"latitude" json:"latitude"`
-	Longitude    float64   `firestore:"longitude" json:"longitude"`
-	ImageUrl     string    `firestore:"imageUrl" json:"imageUrl"`
-	CreatedAt    time.Time `firestore:"createdAt" json:"createdAt"`
-	UpdatedAt    time.Time `firestore:"updatedAt" json:"updatedAt"`
+	ID             string    `firestore:"id" json:"id"`
+	UserID         string    `firestore:"userId" json:"userId"`
+	Username       string    `firestore:"username" json:"username"`
+	LenderName     string    `firestore:"lenderName" json:"lenderName"`
+	ItemName       string    `firestore:"itemName" json:"itemName"`
+	ItemNameAlt    string    `firestore:"-" json:"item_name,omitempty"`
+	Description    string    `firestore:"description" json:"description"`
+	Category       string    `firestore:"category" json:"category"`
+	Condition      string    `firestore:"condition" json:"condition"`
+	Availability   string    `firestore:"availability" json:"availability"`
+	Status         string    `firestore:"status" json:"status"`
+	Area           string    `firestore:"area" json:"area"`
+	Phone          string    `firestore:"phone" json:"phone"`
+	Duration       string    `firestore:"duration" json:"duration"`
+	Latitude       float64   `firestore:"latitude" json:"latitude"`
+	Longitude      float64   `firestore:"longitude" json:"longitude"`
+	ImageUrl       string    `firestore:"imageUrl" json:"imageUrl"`
+	AvailableFrom  time.Time `firestore:"availableFrom,omitempty" json:"availableFrom,omitempty"`
+	AvailableUntil time.Time `firestore:"availableUntil,omitempty" json:"availableUntil,omitempty"`
+	CreatedAt      time.Time `firestore:"createdAt" json:"createdAt"`
+	UpdatedAt      time.Time `firestore:"updatedAt" json:"updatedAt"`
 }
 
 type FirestoreUser struct {
@@ -223,18 +228,27 @@ type FirestoreUser struct {
 }
 
 type FirestoreBorrowRequest struct {
-	ID               int       `firestore:"id" json:"id"`
-	DocID            string    `firestore:"docId" json:"docId"`
-	ItemID           string    `firestore:"itemId" json:"itemId"`
-	ItemName         string    `firestore:"itemName" json:"itemName"`
-	BorrowerUsername string    `firestore:"borrowerUsername" json:"borrowerUsername"`
-	LenderUsername   string    `firestore:"lenderUsername" json:"lenderUsername"`
-	Status           string    `firestore:"status" json:"status"`
-	Note             string    `firestore:"note" json:"note"`
-	ConversationID   *int      `firestore:"conversationId,omitempty" json:"conversationId,omitempty"`
-	CreatedAt        time.Time `firestore:"createdAt" json:"createdAt"`
-	UpdatedAt        time.Time `firestore:"updatedAt" json:"updatedAt"`
+	ID                     int       `firestore:"id" json:"id"`
+	DocID                  string    `firestore:"docId" json:"docId"`
+	ItemID                 string    `firestore:"itemId" json:"itemId"`
+	ItemName               string    `firestore:"itemName" json:"itemName"`
+	BorrowerUsername       string    `firestore:"borrowerUsername" json:"borrowerUsername"`
+	LenderUsername         string    `firestore:"lenderUsername" json:"lenderUsername"`
+	Status                 string    `firestore:"status" json:"status"`
+	Note                   string    `firestore:"note" json:"note"`
+	DurationDays           int       `firestore:"durationDays" json:"durationDays"`
+	Duration               string    `firestore:"duration" json:"duration"`
+	StartDate              time.Time `firestore:"startDate,omitempty" json:"startDate,omitempty"`
+	DueDate                time.Time `firestore:"dueDate,omitempty" json:"dueDate,omitempty"`
+	HandoverConfirmedAt    time.Time `firestore:"handoverConfirmedAt,omitempty" json:"handoverConfirmedAt,omitempty"`
+	ReturnedAt             time.Time `firestore:"returnedAt,omitempty" json:"returnedAt,omitempty"`
+	ExtensionRequestedDays int       `firestore:"extensionRequestedDays,omitempty" json:"extensionRequestedDays,omitempty"`
+	ExtensionStatus        string    `firestore:"extensionStatus,omitempty" json:"extensionStatus,omitempty"`
+	ConversationID         *int      `firestore:"conversationId,omitempty" json:"conversationId,omitempty"`
+	CreatedAt              time.Time `firestore:"createdAt" json:"createdAt"`
+	UpdatedAt              time.Time `firestore:"updatedAt" json:"updatedAt"`
 }
+
 
 type FirestoreBorrowedItem struct {
 	ID              int       `firestore:"id" json:"id"`
@@ -247,6 +261,8 @@ type FirestoreBorrowedItem struct {
 	Since           string    `firestore:"since" json:"since"`
 	Note            string    `firestore:"note" json:"note"`
 	BorrowRequestID int       `firestore:"borrowRequestId" json:"borrowRequestId"`
+	Status          string    `firestore:"status,omitempty" json:"status,omitempty"`
+	BorrowedUntil   time.Time `firestore:"borrowedUntil,omitempty" json:"borrowedUntil,omitempty"`
 	CreatedAt       time.Time `firestore:"createdAt" json:"createdAt"`
 }
 
@@ -293,6 +309,98 @@ type FirestoreMessage struct {
 	Content          string     `firestore:"content" json:"content"`
 	CreatedAt        time.Time  `firestore:"createdAt" json:"createdAt"`
 	ReadAt           *time.Time `firestore:"readAt,omitempty" json:"readAt,omitempty"`
+}
+
+// Lifecycle duration and expiry helpers
+func parseDurationDays(dur string) int {
+	d := strings.ToLower(strings.TrimSpace(dur))
+	if d == "" {
+		return 7
+	}
+	if strings.HasPrefix(d, "-1") {
+		return -1
+	}
+	if strings.Contains(d, "14") {
+		return 14
+	}
+	if strings.Contains(d, "7") {
+		return 7
+	}
+	if strings.Contains(d, "3") {
+		return 3
+	}
+	if strings.Contains(d, "1") && (strings.Contains(d, "day") || d == "1") {
+		return 1
+	}
+	re := regexp.MustCompile(`(-?\d+)`)
+	m := re.FindStringSubmatch(d)
+	if len(m) > 1 {
+		if val, err := strconv.Atoi(m[1]); err == nil && val != 0 {
+			return val
+		}
+	}
+	if strings.Contains(d, "custom") || strings.Contains(d, "flexible") {
+		return 14
+	}
+	return 7
+}
+
+func calculateItemExpiry(createdAt time.Time, durationStr string) time.Time {
+	if createdAt.IsZero() {
+		return time.Now().UTC().Add(7 * 24 * time.Hour)
+	}
+	d := strings.ToLower(strings.TrimSpace(durationStr))
+	if strings.Contains(d, "minute") {
+		re := regexp.MustCompile(`(\d+)`)
+		if m := re.FindStringSubmatch(d); len(m) > 1 {
+			if mins, err := strconv.Atoi(m[1]); err == nil {
+				return createdAt.Add(time.Duration(mins) * time.Minute)
+			}
+		}
+	}
+	if strings.Contains(d, "hour") {
+		re := regexp.MustCompile(`(\d+)`)
+		if m := re.FindStringSubmatch(d); len(m) > 1 {
+			if hrs, err := strconv.Atoi(m[1]); err == nil {
+				return createdAt.Add(time.Duration(hrs) * time.Hour)
+			}
+		}
+	}
+	days := parseDurationDays(durationStr)
+	return createdAt.Add(time.Duration(days) * 24 * time.Hour)
+}
+
+func isItemExpired(item *FirestoreItem, now time.Time) bool {
+	if item == nil {
+		return false
+	}
+	status := strings.ToLower(strings.TrimSpace(item.Status))
+	if status == "expired" {
+		return true
+	}
+	if !item.AvailableUntil.IsZero() {
+		return now.After(item.AvailableUntil)
+	}
+	if !item.CreatedAt.IsZero() && item.Duration != "" {
+		expiry := calculateItemExpiry(item.CreatedAt, item.Duration)
+		return now.After(expiry)
+	}
+	return false
+}
+
+func markItemExpiredInFirestore(ctx context.Context, itemID string) {
+	if !IsFirebaseEnabled() || itemID == "" {
+		return
+	}
+	go func(id string) {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, _ = GetFirestore().Collection("items").Doc(id).Update(bgCtx, []firestore.Update{
+			{Path: "status", Value: "expired"},
+			{Path: "availability", Value: "Expired"},
+			{Path: "updatedAt", Value: time.Now().UTC()},
+		})
+	}(itemID)
 }
 
 type FirestoreRecommendationPost struct {
@@ -655,29 +763,62 @@ type RadarItem struct {
 	DistanceKM  float64     `json:"distanceKm"`
 }
 
+var borrowLifecycleMu sync.Mutex
+
 type BorrowRequestRecord struct {
-	ID               int    `json:"id"`
-	ItemID           string `json:"itemId"`
-	ItemName         string `json:"itemName"`
-	BorrowerUsername string `json:"borrowerUsername"`
-	LenderUsername   string `json:"lenderUsername"`
-	Status           string `json:"status"` // "pending", "accepted", "rejected"
-	Note             string `json:"note"`
-	CreatedAt        string `json:"createdAt"`
-	UpdatedAt        string `json:"updatedAt"`
-	ConversationID   *int   `json:"conversationId,omitempty"`
+	ID                     int    `json:"id"`
+	ItemID                 string `json:"itemId"`
+	ItemName               string `json:"itemName"`
+	BorrowerUsername       string `json:"borrowerUsername"`
+	LenderUsername         string `json:"lenderUsername"`
+	Status                 string `json:"status"` // "pending", "awaiting_handover", "active", "extended", "overdue", "completed", "rejected"
+	Note                   string `json:"note"`
+	DurationDays           int    `json:"durationDays"`
+	Duration               string `json:"duration"`
+	StartDate              string `json:"startDate,omitempty"`
+	DueDate                string `json:"dueDate,omitempty"`
+	HandoverConfirmedAt    string `json:"handoverConfirmedAt,omitempty"`
+	ReturnedAt             string `json:"returnedAt,omitempty"`
+	ExtensionRequestedDays int    `json:"extensionRequestedDays,omitempty"`
+	ExtensionStatus        string `json:"extensionStatus,omitempty"`
+	CreatedAt              string `json:"createdAt"`
+	UpdatedAt              string `json:"updatedAt"`
+	ConversationID         *int   `json:"conversationId,omitempty"`
 }
 
 type CreateBorrowRequestInput struct {
-	ItemID   string `json:"itemId"`
-	ItemName string `json:"itemName"`
-	Lender   string `json:"lender"`
-	Note     string `json:"note"`
+	ItemID       string `json:"itemId"`
+	ItemName     string `json:"itemName"`
+	Lender       string `json:"lender"`
+	Note         string `json:"note"`
+	DurationDays int    `json:"durationDays"`
+	Duration     string `json:"duration"`
 }
 
 type AcceptRejectInput struct {
 	RequestID int `json:"requestId"`
 }
+
+type HandoverInput struct {
+	RequestID int  `json:"requestId"`
+	Received  bool `json:"received"`
+}
+
+type ReturnItemInput struct {
+	RequestID int  `json:"requestId"`
+	Returned  bool `json:"returned"`
+}
+
+type RequestExtensionInput struct {
+	RequestID int `json:"requestId"`
+	Days      int `json:"days"`
+}
+
+type ExtensionDecisionInput struct {
+	RequestID int  `json:"requestId"`
+	Accept    bool `json:"accept"`
+}
+
 
 type ConversationRecord struct {
 	ID               int    `json:"id"`
@@ -1361,6 +1502,7 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			bIter := GetFirestore().Collection("borrowed_items").Where("username", "==", username).Documents(ctx)
+			now := time.Now().UTC()
 			for {
 				doc, err := bIter.Next()
 				if err != nil {
@@ -1368,6 +1510,43 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				var b FirestoreBorrowedItem
 				if err := doc.DataTo(&b); err == nil {
+					if strings.EqualFold(b.Status, "completed") || strings.EqualFold(b.Status, "returned") {
+						continue
+					}
+					isBorrowExpired := false
+					var remainingDays int
+					if !b.BorrowedUntil.IsZero() {
+						if now.After(b.BorrowedUntil) {
+							isBorrowExpired = true
+						} else {
+							remainingDays = int(math.Ceil(b.BorrowedUntil.Sub(now).Hours() / 24.0))
+						}
+					} else if b.DaysLeft > 0 && !b.CreatedAt.IsZero() {
+						expiry := b.CreatedAt.Add(time.Duration(b.DaysLeft) * 24 * time.Hour)
+						if now.After(expiry) {
+							isBorrowExpired = true
+						} else {
+							remainingDays = int(math.Ceil(expiry.Sub(now).Hours() / 24.0))
+						}
+					} else {
+						remainingDays = b.DaysLeft
+					}
+
+					if isBorrowExpired {
+						go func(docRef *firestore.DocumentRef) {
+							bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+							defer cancel()
+							_, _ = docRef.Update(bgCtx, []firestore.Update{
+								{Path: "status", Value: "completed"},
+							})
+						}(doc.Ref)
+						continue
+					}
+
+					if remainingDays <= 0 {
+						remainingDays = 1
+					}
+
 					borrowedMu.Lock()
 					borrowed = append(borrowed, BorrowedItem{
 						ID:       b.ID,
@@ -1375,7 +1554,7 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 						ItemID:   b.ItemID,
 						ItemName: b.ItemName,
 						Lender:   b.Lender,
-						DaysLeft: b.DaysLeft,
+						DaysLeft: remainingDays,
 						Since:    b.Since,
 						Note:     b.Note,
 					})
@@ -1425,6 +1604,7 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			itemIter := GetFirestore().Collection("items").Where("username", "==", username).Documents(ctx)
+			now := time.Now().UTC()
 			for {
 				doc, err := itemIter.Next()
 				if err != nil {
@@ -1435,22 +1615,40 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 					if fItem.ID == "" {
 						fItem.ID = doc.Ref.ID
 					}
+					if fItem.Status != "" && fItem.Status != "active" {
+						continue
+					}
+					if isItemExpired(&fItem, now) {
+						markItemExpiredInFirestore(ctx, fItem.ID)
+						continue
+					}
+					var availFromStr, availUntilStr string
+					if !fItem.AvailableFrom.IsZero() {
+						availFromStr = fItem.AvailableFrom.Format(time.RFC3339)
+					}
+					if !fItem.AvailableUntil.IsZero() {
+						availUntilStr = fItem.AvailableUntil.Format(time.RFC3339)
+					} else if !fItem.CreatedAt.IsZero() {
+						availUntilStr = calculateItemExpiry(fItem.CreatedAt, fItem.Duration).Format(time.RFC3339)
+					}
 					listingsMu.Lock()
 					listings = append(listings, LentItem{
-						ID:          fItem.ID,
-						Username:    fItem.Username,
-						ItemName:    fItem.ItemName,
-						ItemNameAlt: fItem.ItemName,
-						Status:      fItem.Status,
-						Category:    fItem.Category,
-						Description: fItem.Description,
-						LenderName:  fItem.LenderName,
-						Area:        fItem.Area,
-						Phone:       fItem.Phone,
-						Duration:    fItem.Duration,
-						Condition:   fItem.Condition,
-						ImageUrl:    fItem.ImageUrl,
-						CreatedAt:   fItem.CreatedAt.Format(time.RFC3339),
+						ID:             fItem.ID,
+						Username:       fItem.Username,
+						ItemName:       fItem.ItemName,
+						ItemNameAlt:    fItem.ItemName,
+						Status:         fItem.Status,
+						Category:       fItem.Category,
+						Description:    fItem.Description,
+						LenderName:     fItem.LenderName,
+						Area:           fItem.Area,
+						Phone:          fItem.Phone,
+						Duration:       fItem.Duration,
+						Condition:      fItem.Condition,
+						ImageUrl:       fItem.ImageUrl,
+						AvailableFrom:  availFromStr,
+						AvailableUntil: availUntilStr,
+						CreatedAt:      fItem.CreatedAt.Format(time.RFC3339),
 					})
 					listingsMu.Unlock()
 				}
@@ -1460,14 +1658,8 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 
 		wg.Wait()
 		totalBorrowedCount = len(borrowed)
+		totalLentCount = len(lent)
 
-		// Active lending listings = real user's active Firestore listings
-		displayLent := lent
-		if len(displayLent) == 0 && len(listings) > 0 {
-			displayLent = listings
-		}
-		totalLentCount = len(listings) + len(lent)
-		lent = displayLent
 
 	} else {
 		// SQLite fallback
@@ -1554,6 +1746,7 @@ func publicProfileHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		iter := GetFirestore().Collection("items").Where("username", "==", targetUser).Documents(ctx)
+		now := time.Now().UTC()
 		for {
 			doc, err := iter.Next()
 			if err != nil {
@@ -1564,21 +1757,39 @@ func publicProfileHandler(w http.ResponseWriter, r *http.Request) {
 				if fItem.ID == "" {
 					fItem.ID = doc.Ref.ID
 				}
+				if fItem.Status != "" && fItem.Status != "active" {
+					continue
+				}
+				if isItemExpired(&fItem, now) {
+					markItemExpiredInFirestore(ctx, fItem.ID)
+					continue
+				}
+				var availFromStr, availUntilStr string
+				if !fItem.AvailableFrom.IsZero() {
+					availFromStr = fItem.AvailableFrom.Format(time.RFC3339)
+				}
+				if !fItem.AvailableUntil.IsZero() {
+					availUntilStr = fItem.AvailableUntil.Format(time.RFC3339)
+				} else if !fItem.CreatedAt.IsZero() {
+					availUntilStr = calculateItemExpiry(fItem.CreatedAt, fItem.Duration).Format(time.RFC3339)
+				}
 				lent = append(lent, LentItem{
-					ID:          fItem.ID,
-					Username:    fItem.Username,
-					ItemName:    fItem.ItemName,
-					ItemNameAlt: fItem.ItemName,
-					Status:      fItem.Status,
-					Category:    fItem.Category,
-					Description: fItem.Description,
-					LenderName:  fItem.LenderName,
-					Area:        fItem.Area,
-					Phone:       fItem.Phone,
-					Duration:    fItem.Duration,
-					Condition:   fItem.Condition,
-					ImageUrl:    fItem.ImageUrl,
-					CreatedAt:   fItem.CreatedAt.Format(time.RFC3339),
+					ID:             fItem.ID,
+					Username:       fItem.Username,
+					ItemName:       fItem.ItemName,
+					ItemNameAlt:    fItem.ItemName,
+					Status:         fItem.Status,
+					Category:       fItem.Category,
+					Description:    fItem.Description,
+					LenderName:     fItem.LenderName,
+					Area:           fItem.Area,
+					Phone:          fItem.Phone,
+					Duration:       fItem.Duration,
+					Condition:      fItem.Condition,
+					ImageUrl:       fItem.ImageUrl,
+					AvailableFrom:  availFromStr,
+					AvailableUntil: availUntilStr,
+					CreatedAt:      fItem.CreatedAt.Format(time.RFC3339),
 				})
 			}
 		}
@@ -1805,26 +2016,29 @@ func lendHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		now := time.Now().UTC()
+		expiry := calculateItemExpiry(now, duration)
 		itemDoc := FirestoreItem{
-			ID:           itemID,
-			UserID:       strconv.Itoa(dbUserID),
-			Username:     uCtx.Username,
-			LenderName:   lenderName,
-			ItemName:     req.ItemName,
-			ItemNameAlt:  req.ItemName,
-			Description:  req.Description,
-			Category:     category,
-			Condition:    condition,
-			Availability: "Available Now",
-			Status:       "active",
-			Area:         area,
-			Phone:        phone,
-			Duration:     duration,
-			Latitude:     itemLat,
-			Longitude:    itemLng,
-			ImageUrl:     imageURL,
-			CreatedAt:    now,
-			UpdatedAt:    now,
+			ID:             itemID,
+			UserID:         strconv.Itoa(dbUserID),
+			Username:       uCtx.Username,
+			LenderName:     lenderName,
+			ItemName:       req.ItemName,
+			ItemNameAlt:    req.ItemName,
+			Description:    req.Description,
+			Category:       category,
+			Condition:      condition,
+			Availability:   "Available Now",
+			Status:         "active",
+			Area:           area,
+			Phone:          phone,
+			Duration:       duration,
+			Latitude:       itemLat,
+			Longitude:      itemLng,
+			ImageUrl:       imageURL,
+			AvailableFrom:  now,
+			AvailableUntil: expiry,
+			CreatedAt:      now,
+			UpdatedAt:      now,
 		}
 
 		if _, err := docRef.Set(r.Context(), itemDoc); err != nil {
@@ -1901,6 +2115,7 @@ func getItemsHandler(w http.ResponseWriter, r *http.Request) {
 		defer iter.Stop()
 
 		items := []FirestoreItem{}
+		now := time.Now().UTC()
 		for {
 			doc, err := iter.Next()
 			if err == iterator.Done {
@@ -1921,6 +2136,10 @@ func getItemsHandler(w http.ResponseWriter, r *http.Request) {
 				item.ID = doc.Ref.ID
 			}
 			if item.Status != "" && item.Status != "active" {
+				continue
+			}
+			if isItemExpired(&item, now) {
+				markItemExpiredInFirestore(ctx, item.ID)
 				continue
 			}
 			item.ItemNameAlt = item.ItemName
@@ -1946,7 +2165,7 @@ func getItemsHandler(w http.ResponseWriter, r *http.Request) {
 		COALESCE(lender_name, username), COALESCE(area, 'Nearby'), COALESCE(phone, ''),
 		COALESCE(duration, '7 Days'), COALESCE(condition, 'Good Working 👍'), COALESCE(image_url, ''),
 		created_at
-		FROM lent_items ORDER BY id DESC`)
+		FROM lent_items WHERE status = 'active' OR status = '' ORDER BY id DESC`)
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
@@ -2306,6 +2525,10 @@ func radarItemsHandler(w http.ResponseWriter, r *http.Request) {
 			if item.Status != "" && item.Status != "active" {
 				continue
 			}
+			if isItemExpired(&item, time.Now().UTC()) {
+				markItemExpiredInFirestore(ctx, item.ID)
+				continue
+			}
 
 			var ownerLat, ownerLng float64
 			var shelfName, ownerPhone string
@@ -2571,7 +2794,22 @@ func createBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 2. Lender and Item Name come strictly from the actual Firestore item document
+		now := time.Now().UTC()
+
+		// 2. Check if item has already been borrowed or is inactive
+		if fItem.Status != "" && fItem.Status != "active" {
+			http.Error(w, "This item has already been borrowed and is not available to borrow", http.StatusBadRequest)
+			return
+		}
+
+		// 3. Check if lending availability period has expired
+		if isItemExpired(fItem, now) {
+			markItemExpiredInFirestore(ctx, fItem.ID)
+			http.Error(w, "The lending availability period for this item has expired", http.StatusBadRequest)
+			return
+		}
+
+		// 4. Lender and Item Name come strictly from the actual Firestore item document
 		realLender := fItem.Username
 		if realLender == "" {
 			realLender = fItem.LenderName
@@ -2579,7 +2817,7 @@ func createBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 		realItemName := fItem.ItemName
 		req.ItemID = fItem.ID
 
-		// 3. Prevent a user from requesting their own item
+		// 5. Prevent a user from requesting their own item
 		if strings.EqualFold(realLender, uCtx.Username) || (fItem.UserID != "" && fItem.UserID == strconv.Itoa(uCtx.UserID)) {
 			http.Error(w, "You cannot borrow your own item", http.StatusBadRequest)
 			return
@@ -2597,17 +2835,36 @@ func createBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			var existing FirestoreBorrowRequest
 			if err := doc.DataTo(&existing); err == nil {
-				if existing.Status == "pending" || existing.Status == "accepted" {
+				if existing.Status == "pending" || existing.Status == "accepted" || existing.Status == "awaiting_handover" || existing.Status == "active" || existing.Status == "extended" || existing.Status == "overdue" {
 					iter.Stop()
-					http.Error(w, "A borrow request for this item is already pending or accepted", http.StatusConflict)
+					http.Error(w, "A borrow request for this item is already pending or active", http.StatusConflict)
 					return
 				}
 			}
 		}
 		iter.Stop()
 
-		// 5. Create real borrow request in borrow_requests/{requestId}
-		now := time.Now().UTC()
+		// 5. Calculate borrow duration
+		durDays := req.DurationDays
+		if durDays <= 0 && req.Duration != "" {
+			durDays = parseDurationDays(req.Duration)
+		}
+		if durDays <= 0 && req.Note != "" {
+			durDays = parseDurationDays(req.Note)
+		}
+		if durDays <= 0 && fItem.Duration != "" {
+			durDays = parseDurationDays(fItem.Duration)
+		}
+		if durDays <= 0 {
+			durDays = 3
+		}
+		durStr := req.Duration
+		if durStr == "" {
+			durStr = fmt.Sprintf("%d Days", durDays)
+		}
+
+		// 6. Create real borrow request in borrow_requests/{requestId}
+		now = time.Now().UTC()
 		docID := strconv.Itoa(numID)
 		docRef := GetFirestore().Collection("borrow_requests").Doc(docID)
 		fReq := FirestoreBorrowRequest{
@@ -2619,6 +2876,8 @@ func createBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 			LenderUsername:   realLender,
 			Status:           "pending",
 			Note:             req.Note,
+			DurationDays:     durDays,
+			Duration:         durStr,
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		}
@@ -2631,11 +2890,12 @@ func createBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": "Borrow request sent successfully",
-			"id":      numID,
-			"status":  "pending",
-			"item":    realItemName,
-			"lender":  realLender,
+			"message":  "Borrow request sent successfully",
+			"id":       numID,
+			"status":   "pending",
+			"item":     realItemName,
+			"lender":   realLender,
+			"duration": durStr,
 		})
 		return
 	} else {
@@ -2729,16 +2989,38 @@ func getBorrowRequestsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				seen[fReq.ID] = true
+				status := fReq.Status
+				now := time.Now().UTC()
+				if (status == "active" || status == "extended") && !fReq.DueDate.IsZero() && now.After(fReq.DueDate) {
+					status = "overdue"
+				}
+
 				rec := BorrowRequestRecord{
-					ID:               fReq.ID,
-					ItemID:           fReq.ItemID,
-					ItemName:         fReq.ItemName,
-					BorrowerUsername: fReq.BorrowerUsername,
-					LenderUsername:   fReq.LenderUsername,
-					Status:           fReq.Status,
-					Note:             fReq.Note,
-					CreatedAt:        fReq.CreatedAt.Format("2006-01-02 15:04:05"),
-					UpdatedAt:        fReq.UpdatedAt.Format("2006-01-02 15:04:05"),
+					ID:                     fReq.ID,
+					ItemID:                 fReq.ItemID,
+					ItemName:               fReq.ItemName,
+					BorrowerUsername:       fReq.BorrowerUsername,
+					LenderUsername:         fReq.LenderUsername,
+					Status:                 status,
+					Note:                   fReq.Note,
+					DurationDays:           fReq.DurationDays,
+					Duration:               fReq.Duration,
+					ExtensionRequestedDays: fReq.ExtensionRequestedDays,
+					ExtensionStatus:        fReq.ExtensionStatus,
+					CreatedAt:              fReq.CreatedAt.Format("2006-01-02 15:04:05"),
+					UpdatedAt:              fReq.UpdatedAt.Format("2006-01-02 15:04:05"),
+				}
+				if !fReq.StartDate.IsZero() {
+					rec.StartDate = fReq.StartDate.Format("2006-01-02 15:04:05")
+				}
+				if !fReq.DueDate.IsZero() {
+					rec.DueDate = fReq.DueDate.Format("2006-01-02 15:04:05")
+				}
+				if !fReq.HandoverConfirmedAt.IsZero() {
+					rec.HandoverConfirmedAt = fReq.HandoverConfirmedAt.Format("2006-01-02 15:04:05")
+				}
+				if !fReq.ReturnedAt.IsZero() {
+					rec.ReturnedAt = fReq.ReturnedAt.Format("2006-01-02 15:04:05")
 				}
 				if convID, exists := convMap[fReq.ID]; exists {
 					rec.ConversationID = &convID
@@ -2761,16 +3043,39 @@ func getBorrowRequestsHandler(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				seen[fReq.ID] = true
+
+				status := fReq.Status
+				now := time.Now().UTC()
+				if (status == "active" || status == "extended") && !fReq.DueDate.IsZero() && now.After(fReq.DueDate) {
+					status = "overdue"
+				}
+
 				rec := BorrowRequestRecord{
-					ID:               fReq.ID,
-					ItemID:           fReq.ItemID,
-					ItemName:         fReq.ItemName,
-					BorrowerUsername: fReq.BorrowerUsername,
-					LenderUsername:   fReq.LenderUsername,
-					Status:           fReq.Status,
-					Note:             fReq.Note,
-					CreatedAt:        fReq.CreatedAt.Format("2006-01-02 15:04:05"),
-					UpdatedAt:        fReq.UpdatedAt.Format("2006-01-02 15:04:05"),
+					ID:                     fReq.ID,
+					ItemID:                 fReq.ItemID,
+					ItemName:               fReq.ItemName,
+					BorrowerUsername:       fReq.BorrowerUsername,
+					LenderUsername:         fReq.LenderUsername,
+					Status:                 status,
+					Note:                   fReq.Note,
+					DurationDays:           fReq.DurationDays,
+					Duration:               fReq.Duration,
+					ExtensionRequestedDays: fReq.ExtensionRequestedDays,
+					ExtensionStatus:        fReq.ExtensionStatus,
+					CreatedAt:              fReq.CreatedAt.Format("2006-01-02 15:04:05"),
+					UpdatedAt:              fReq.UpdatedAt.Format("2006-01-02 15:04:05"),
+				}
+				if !fReq.StartDate.IsZero() {
+					rec.StartDate = fReq.StartDate.Format("2006-01-02 15:04:05")
+				}
+				if !fReq.DueDate.IsZero() {
+					rec.DueDate = fReq.DueDate.Format("2006-01-02 15:04:05")
+				}
+				if !fReq.HandoverConfirmedAt.IsZero() {
+					rec.HandoverConfirmedAt = fReq.HandoverConfirmedAt.Format("2006-01-02 15:04:05")
+				}
+				if !fReq.ReturnedAt.IsZero() {
+					rec.ReturnedAt = fReq.ReturnedAt.Format("2006-01-02 15:04:05")
 				}
 				if convID, exists := convMap[fReq.ID]; exists {
 					rec.ConversationID = &convID
@@ -2835,6 +3140,9 @@ func acceptBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var convID int
 
+	borrowLifecycleMu.Lock()
+	defer borrowLifecycleMu.Unlock()
+
 	if IsFirebaseEnabled() {
 		var docRef *firestore.DocumentRef
 		var fReq FirestoreBorrowRequest
@@ -2872,11 +3180,63 @@ func acceptBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		now := time.Now().UTC()
+		// Re-check item availability under lock: ensure item is not already borrowed
+		var itemDocRef *firestore.DocumentRef
+		var itemData FirestoreItem
+		if fReq.ItemID != "" {
+			iSnap, iErr := GetFirestore().Collection("items").Doc(fReq.ItemID).Get(ctx)
+			if iErr == nil && iSnap.Exists() {
+				itemDocRef = iSnap.Ref
+				_ = iSnap.DataTo(&itemData)
+			} else {
+				iter := GetFirestore().Collection("items").Where("id", "==", fReq.ItemID).Limit(1).Documents(ctx)
+				if iDoc, iErr2 := iter.Next(); iErr2 == nil && iDoc.Exists() {
+					itemDocRef = iDoc.Ref
+					_ = iDoc.DataTo(&itemData)
+				}
+				iter.Stop()
+			}
+		}
+		if itemDocRef == nil && fReq.ItemName != "" {
+			iter := GetFirestore().Collection("items").Where("itemName", "==", fReq.ItemName).Limit(1).Documents(ctx)
+			if iDoc, iErr2 := iter.Next(); iErr2 == nil && iDoc.Exists() {
+				itemDocRef = iDoc.Ref
+				_ = iDoc.DataTo(&itemData)
+			}
+			iter.Stop()
+		}
 
-		// Update borrow request status to accepted
+		if itemData.Status != "" && itemData.Status != "active" {
+			http.Error(w, "This item is already borrowed and not available", http.StatusConflict)
+			return
+		}
+
+		// Calculate borrow duration from accepted request
+		borrowDays := fReq.DurationDays
+		if borrowDays <= 0 && fReq.Duration != "" {
+			borrowDays = parseDurationDays(fReq.Duration)
+		}
+		if borrowDays <= 0 && fReq.Note != "" {
+			borrowDays = parseDurationDays(fReq.Note)
+		}
+		if borrowDays <= 0 && itemData.Duration != "" {
+			borrowDays = parseDurationDays(itemData.Duration)
+		}
+		if borrowDays <= 0 {
+			borrowDays = 3
+		}
+
+		now := time.Now().UTC()
+		startDate := now
+		dueDate := now.Add(time.Duration(borrowDays) * 24 * time.Hour)
+
+		// 1. Update accepted borrow request: initial status is "awaiting_handover"
 		_, err = docRef.Update(ctx, []firestore.Update{
-			{Path: "status", Value: "accepted"},
+			{Path: "status", Value: "awaiting_handover"},
+			{Path: "durationDays", Value: borrowDays},
+			{Path: "duration", Value: fmt.Sprintf("%d Days", borrowDays)},
+			{Path: "startDate", Value: startDate},
+			{Path: "dueDate", Value: dueDate},
 			{Path: "updatedAt", Value: now},
 		})
 		if err != nil {
@@ -2884,24 +3244,37 @@ func acceptBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Insert into Firestore borrowed_items
-		borrowedDocRef := GetFirestore().Collection("borrowed_items").NewDoc()
-		borrowedItemDoc := FirestoreBorrowedItem{
-			ID:              generateNumericID(),
-			DocID:           borrowedDocRef.ID,
-			Username:        fReq.BorrowerUsername,
-			ItemID:          fReq.ItemID,
-			ItemName:        fReq.ItemName,
-			Lender:          fReq.LenderUsername,
-			DaysLeft:        3,
-			Since:           "Just accepted",
-			Note:            "Accepted via Mohalla Store",
-			BorrowRequestID: fReq.ID,
-			CreatedAt:       now,
+		// 2. Atomically update item to "borrowed" so it disappears from Explore immediately
+		if itemDocRef != nil {
+			_, uErr := itemDocRef.Update(ctx, []firestore.Update{
+				{Path: "status", Value: "borrowed"},
+				{Path: "availability", Value: "Currently Borrowed"},
+				{Path: "updatedAt", Value: now},
+			})
+			if uErr != nil {
+				log.Printf("[Firestore] Error updating item status to borrowed: %v", uErr)
+			}
 		}
-		_, _ = borrowedDocRef.Set(ctx, borrowedItemDoc)
 
-		// Create or find conversation in Firestore conversations
+		// 3. Auto-reject all other pending requests for this item synchronously
+		pIter := GetFirestore().Collection("borrow_requests").Where("itemId", "==", fReq.ItemID).Where("status", "==", "pending").Documents(ctx)
+		for {
+			pDoc, pErr := pIter.Next()
+			if pErr != nil {
+				break
+			}
+			var pReq FirestoreBorrowRequest
+			if pDoc.DataTo(&pReq) == nil && pReq.ID != fReq.ID {
+				_, _ = pDoc.Ref.Update(ctx, []firestore.Update{
+					{Path: "status", Value: "rejected"},
+					{Path: "note", Value: "Item has been lent to another neighbor"},
+					{Path: "updatedAt", Value: now},
+				})
+			}
+		}
+		pIter.Stop()
+
+		// 4. Create or find conversation in Firestore conversations (only for accepted borrower)
 		convIter := GetFirestore().Collection("conversations").Where("borrowRequestId", "==", fReq.ID).Limit(1).Documents(ctx)
 		cDoc, cErr := convIter.Next()
 		convIter.Stop()
@@ -2938,7 +3311,55 @@ func acceptBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 			{Path: "conversationId", Value: convID},
 		})
 
+		// 5. Insert into Firestore lent_items (increases lender's lend count by 1)
+		lentDocRef := GetFirestore().Collection("lent_items").NewDoc()
+		lentItemDoc := FirestoreLentItem{
+			ID:               generateNumericID(),
+			DocID:            lentDocRef.ID,
+			Username:         fReq.LenderUsername,
+			BorrowerUsername: fReq.BorrowerUsername,
+			ItemID:           fReq.ItemID,
+			ItemName:         fReq.ItemName,
+			Status:           "borrowed",
+			Category:         itemData.Category,
+			Description:      itemData.Description,
+			LenderName:       fReq.LenderUsername,
+			Area:             itemData.Area,
+			Phone:            itemData.Phone,
+			Duration:         fmt.Sprintf("%d Days", borrowDays),
+			Condition:        itemData.Condition,
+			ImageUrl:         itemData.ImageUrl,
+			BorrowRequestID:  fReq.ID,
+			CreatedAt:        now,
+		}
+		_, _ = lentDocRef.Set(ctx, lentItemDoc)
+
+		// 6. Insert into Firestore borrowed_items (for borrower profile)
+		borrowedDocRef := GetFirestore().Collection("borrowed_items").NewDoc()
+		borrowedItemDoc := FirestoreBorrowedItem{
+			ID:              generateNumericID(),
+			DocID:           borrowedDocRef.ID,
+			Username:        fReq.BorrowerUsername,
+			ItemID:          fReq.ItemID,
+			ItemName:        fReq.ItemName,
+			Lender:          fReq.LenderUsername,
+			DaysLeft:        borrowDays,
+			Since:           "Just accepted",
+			Note:            "Accepted via Mohalla Store",
+			BorrowRequestID: fReq.ID,
+			Status:          "awaiting_handover",
+			BorrowedUntil:   dueDate,
+			CreatedAt:       now,
+		}
+		_, _ = borrowedDocRef.Set(ctx, borrowedItemDoc)
+
+		// 7. Post initial system message to chat
+		sendSystemChatMessage(ctx, convID, fReq.LenderUsername, fReq.BorrowerUsername,
+			fmt.Sprintf("🎉 Borrow request accepted for %s (%d days)! Please confirm once the physical item is received.",
+				fReq.ItemName, borrowDays))
+
 	} else {
+		// SQLite fallback
 		var lenderUsername, borrowerUsername, itemID, itemName, status string
 		err := db.QueryRow("SELECT lender_username, borrower_username, item_id, item_name, status FROM borrow_requests WHERE id = ?", req.RequestID).
 			Scan(&lenderUsername, &borrowerUsername, &itemID, &itemName, &status)
@@ -2957,7 +3378,9 @@ func acceptBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		_, _ = db.Exec("UPDATE borrow_requests SET status = 'accepted', updated_at = datetime('now') WHERE id = ?", req.RequestID)
+		_, _ = db.Exec("UPDATE borrow_requests SET status = 'awaiting_handover', updated_at = datetime('now') WHERE id = ?", req.RequestID)
+		_, _ = db.Exec("UPDATE lent_items SET status = 'borrowed' WHERE id = ? OR item_name = ?", itemID, itemName)
+		_, _ = db.Exec("UPDATE borrow_requests SET status = 'rejected', note = 'Item has been lent to another borrower' WHERE item_id = ? AND status = 'pending' AND id != ?", itemID, req.RequestID)
 		res, err := db.Exec(
 			"INSERT INTO conversations (borrow_request_id, borrower_username, lender_username, item_id, item_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
 			req.RequestID, borrowerUsername, lenderUsername, itemID, itemName,
@@ -2978,7 +3401,7 @@ func acceptBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message":        "Borrow request accepted successfully",
 		"conversationId": convID,
-		"status":         "accepted",
+		"status":         "awaiting_handover",
 	})
 }
 
@@ -3073,6 +3496,587 @@ func rejectBorrowRequestHandler(w http.ResponseWriter, r *http.Request) {
 		"status":  "rejected",
 	})
 }
+
+func sendSystemChatMessage(ctx context.Context, convID int, senderUsername, receiverUsername, content string) {
+	if convID <= 0 {
+		return
+	}
+	now := time.Now().UTC()
+	msgID := generateNumericID()
+	msgDocID := strconv.Itoa(msgID)
+
+	msgRecord := MessageRecord{
+		ID:               msgID,
+		ConversationID:   convID,
+		SenderUsername:   senderUsername,
+		ReceiverUsername: receiverUsername,
+		Content:          content,
+		CreatedAt:        now.Format("2006-01-02 15:04:05"),
+	}
+
+	if IsFirebaseEnabled() {
+		convDocID := strconv.Itoa(convID)
+		cDocRef := GetFirestore().Collection("conversations").Doc(convDocID)
+
+		fMsg := FirestoreMessage{
+			ID:               msgID,
+			DocID:            msgDocID,
+			ConversationID:   convID,
+			SenderUsername:   senderUsername,
+			ReceiverUsername: receiverUsername,
+			Content:          content,
+			CreatedAt:        now,
+		}
+
+		_, _ = cDocRef.Collection("messages").Doc(msgDocID).Set(ctx, fMsg)
+		_, _ = GetFirestore().Collection("messages").Doc(msgDocID).Set(ctx, fMsg)
+		_, _ = cDocRef.Update(ctx, []firestore.Update{
+			{Path: "lastMessage", Value: content},
+			{Path: "lastMessageTime", Value: now.Format("2006-01-02 15:04:05")},
+			{Path: "updatedAt", Value: now},
+		})
+	} else {
+		_, _ = db.Exec(
+			"INSERT INTO messages (conversation_id, sender_username, content, created_at) VALUES (?, ?, ?, datetime('now'))",
+			convID, senderUsername, content,
+		)
+		_, _ = db.Exec("UPDATE conversations SET updated_at = datetime('now') WHERE id = ?", convID)
+	}
+
+	select {
+	case hub.broadcast <- BroadcastMessage{
+		ConversationID: convID,
+		Message:        msgRecord,
+	}:
+	default:
+	}
+}
+
+func confirmHandoverHandler(w http.ResponseWriter, r *http.Request) {
+	uCtx, ok := getUserFromContext(r)
+	if !ok || uCtx.Username == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req HandoverInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RequestID <= 0 {
+		http.Error(w, "Invalid requestId", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	now := time.Now().UTC()
+
+	if IsFirebaseEnabled() {
+		var docRef *firestore.DocumentRef
+		var fReq FirestoreBorrowRequest
+
+		doc, err := GetFirestore().Collection("borrow_requests").Doc(strconv.Itoa(req.RequestID)).Get(ctx)
+		if err == nil && doc.Exists() {
+			if doc.DataTo(&fReq) == nil {
+				docRef = doc.Ref
+			}
+		}
+		if docRef == nil {
+			iter := GetFirestore().Collection("borrow_requests").Where("id", "==", req.RequestID).Limit(1).Documents(ctx)
+			doc, err := iter.Next()
+			iter.Stop()
+			if err == nil && doc.Exists() {
+				if doc.DataTo(&fReq) == nil {
+					docRef = doc.Ref
+				}
+			}
+		}
+		if docRef == nil {
+			http.Error(w, "Borrow request not found", http.StatusNotFound)
+			return
+		}
+
+		if !strings.EqualFold(fReq.BorrowerUsername, uCtx.Username) && !strings.EqualFold(fReq.LenderUsername, uCtx.Username) {
+			http.Error(w, "Forbidden: Only transaction participants can confirm handover", http.StatusForbidden)
+			return
+		}
+
+		if !req.Received {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"message": "Handover pending borrower confirmation",
+				"status":  fReq.Status,
+			})
+			return
+		}
+
+		durDays := fReq.DurationDays
+		if durDays <= 0 {
+			durDays = 3
+		}
+		dueDate := now.Add(time.Duration(durDays) * 24 * time.Hour)
+
+		_, err = docRef.Update(ctx, []firestore.Update{
+			{Path: "status", Value: "active"},
+			{Path: "handoverConfirmedAt", Value: now},
+			{Path: "startDate", Value: now},
+			{Path: "dueDate", Value: dueDate},
+			{Path: "updatedAt", Value: now},
+		})
+		if err != nil {
+			http.Error(w, "Failed to update borrow request: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Update borrowed_items and lent_items
+		bIter := GetFirestore().Collection("borrowed_items").Where("borrowRequestId", "==", fReq.ID).Documents(ctx)
+		for {
+			bDoc, bErr := bIter.Next()
+			if bErr != nil {
+				break
+			}
+			_, _ = bDoc.Ref.Update(ctx, []firestore.Update{
+				{Path: "status", Value: "active"},
+				{Path: "borrowedUntil", Value: dueDate},
+				{Path: "daysLeft", Value: durDays},
+			})
+		}
+		bIter.Stop()
+
+		lIter := GetFirestore().Collection("lent_items").Where("borrowRequestId", "==", fReq.ID).Documents(ctx)
+		for {
+			lDoc, lErr := lIter.Next()
+			if lErr != nil {
+				break
+			}
+			_, _ = lDoc.Ref.Update(ctx, []firestore.Update{
+				{Path: "status", Value: "borrowed"},
+			})
+		}
+		lIter.Stop()
+
+		if fReq.ConversationID != nil {
+			sendSystemChatMessage(ctx, *fReq.ConversationID, uCtx.Username, fReq.LenderUsername,
+				fmt.Sprintf("🤝 @%s confirmed receiving %s! Borrowing is now ACTIVE. Expected return by: %s.",
+					fReq.BorrowerUsername, fReq.ItemName, dueDate.Format("Jan 02, 2006")))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Handover confirmed! Borrowing is now active.",
+			"status":  "active",
+			"dueDate": dueDate.Format("2006-01-02 15:04:05"),
+		})
+		return
+	} else {
+		// SQLite fallback
+		_, _ = db.Exec("UPDATE borrow_requests SET status = 'active', updated_at = datetime('now') WHERE id = ?", req.RequestID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Handover confirmed! Borrowing is now active.",
+			"status":  "active",
+		})
+	}
+}
+
+func returnItemHandler(w http.ResponseWriter, r *http.Request) {
+	uCtx, ok := getUserFromContext(r)
+	if !ok || uCtx.Username == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ReturnItemInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RequestID <= 0 {
+		http.Error(w, "Invalid requestId", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	now := time.Now().UTC()
+
+	if IsFirebaseEnabled() {
+		var docRef *firestore.DocumentRef
+		var fReq FirestoreBorrowRequest
+
+		doc, err := GetFirestore().Collection("borrow_requests").Doc(strconv.Itoa(req.RequestID)).Get(ctx)
+		if err == nil && doc.Exists() {
+			if doc.DataTo(&fReq) == nil {
+				docRef = doc.Ref
+			}
+		}
+		if docRef == nil {
+			iter := GetFirestore().Collection("borrow_requests").Where("id", "==", req.RequestID).Limit(1).Documents(ctx)
+			doc, err := iter.Next()
+			iter.Stop()
+			if err == nil && doc.Exists() {
+				if doc.DataTo(&fReq) == nil {
+					docRef = doc.Ref
+				}
+			}
+		}
+		if docRef == nil {
+			http.Error(w, "Borrow request not found", http.StatusNotFound)
+			return
+		}
+
+		if !strings.EqualFold(fReq.LenderUsername, uCtx.Username) {
+			http.Error(w, "Forbidden: Only the lender can confirm item return", http.StatusForbidden)
+			return
+		}
+
+		if !req.Returned {
+			// Lender selected "Not yet"
+			_, _ = docRef.Update(ctx, []firestore.Update{
+				{Path: "status", Value: "overdue"},
+				{Path: "updatedAt", Value: now},
+			})
+			if fReq.ConversationID != nil {
+				sendSystemChatMessage(ctx, *fReq.ConversationID, uCtx.Username, fReq.BorrowerUsername,
+					fmt.Sprintf("⚠️ Lender checked return status: %s has NOT yet been returned.", fReq.ItemName))
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"message": "Item marked as overdue / not yet returned",
+				"status":  "overdue",
+			})
+			return
+		}
+
+		borrowLifecycleMu.Lock()
+		defer borrowLifecycleMu.Unlock()
+
+		// 1. Mark borrow request as completed
+		_, err = docRef.Update(ctx, []firestore.Update{
+			{Path: "status", Value: "completed"},
+			{Path: "returnedAt", Value: now},
+			{Path: "updatedAt", Value: now},
+		})
+		if err != nil {
+			http.Error(w, "Failed to update borrow request: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// 2. Reset item status back to "active" / "Available Now" so it reappears in Explore immediately
+		var itemDocRef *firestore.DocumentRef
+		if fReq.ItemID != "" {
+			iSnap, iErr := GetFirestore().Collection("items").Doc(fReq.ItemID).Get(ctx)
+			if iErr == nil && iSnap.Exists() {
+				itemDocRef = iSnap.Ref
+			} else {
+				iter := GetFirestore().Collection("items").Where("id", "==", fReq.ItemID).Limit(1).Documents(ctx)
+				if iDoc, iErr2 := iter.Next(); iErr2 == nil && iDoc.Exists() {
+					itemDocRef = iDoc.Ref
+				}
+				iter.Stop()
+			}
+		}
+		if itemDocRef == nil && fReq.ItemName != "" {
+			iter := GetFirestore().Collection("items").Where("itemName", "==", fReq.ItemName).Limit(1).Documents(ctx)
+			if iDoc, iErr2 := iter.Next(); iErr2 == nil && iDoc.Exists() {
+				itemDocRef = iDoc.Ref
+			}
+			iter.Stop()
+		}
+
+		if itemDocRef != nil {
+			_, _ = itemDocRef.Update(ctx, []firestore.Update{
+				{Path: "status", Value: "active"},
+				{Path: "availability", Value: "Available Now"},
+				{Path: "updatedAt", Value: now},
+			})
+		}
+
+		// 3. Update borrowed_items status to completed
+		bIter := GetFirestore().Collection("borrowed_items").Where("borrowRequestId", "==", fReq.ID).Documents(ctx)
+		for {
+			bDoc, bErr := bIter.Next()
+			if bErr != nil {
+				break
+			}
+			_, _ = bDoc.Ref.Update(ctx, []firestore.Update{
+				{Path: "status", Value: "completed"},
+				{Path: "daysLeft", Value: 0},
+			})
+		}
+		bIter.Stop()
+
+		// 4. Update lent_items status to completed (retaining history for lender stats)
+		lIter := GetFirestore().Collection("lent_items").Where("borrowRequestId", "==", fReq.ID).Documents(ctx)
+		for {
+			lDoc, lErr := lIter.Next()
+			if lErr != nil {
+				break
+			}
+			_, _ = lDoc.Ref.Update(ctx, []firestore.Update{
+				{Path: "status", Value: "completed"},
+			})
+		}
+		lIter.Stop()
+
+		// 5. Send system message to conversation
+		if fReq.ConversationID != nil {
+			sendSystemChatMessage(ctx, *fReq.ConversationID, uCtx.Username, fReq.BorrowerUsername,
+				fmt.Sprintf("✨ @%s confirmed that %s has been returned safely! Borrowing is complete. Thank you!",
+					uCtx.Username, fReq.ItemName))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Item returned successfully! Item is now available again in Explore.",
+			"status":  "completed",
+		})
+		return
+	} else {
+		// SQLite fallback
+		borrowLifecycleMu.Lock()
+		defer borrowLifecycleMu.Unlock()
+		_, _ = db.Exec("UPDATE borrow_requests SET status = 'completed', updated_at = datetime('now') WHERE id = ?", req.RequestID)
+		_, _ = db.Exec("UPDATE lent_items SET status = 'active' WHERE id = ? OR item_name = ?", req.RequestID, "")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Item returned successfully!",
+			"status":  "completed",
+		})
+	}
+}
+
+func requestExtensionHandler(w http.ResponseWriter, r *http.Request) {
+	uCtx, ok := getUserFromContext(r)
+	if !ok || uCtx.Username == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req RequestExtensionInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RequestID <= 0 {
+		http.Error(w, "Invalid requestId", http.StatusBadRequest)
+		return
+	}
+	if req.Days <= 0 || req.Days > 14 {
+		http.Error(w, "Extension days must be between 1 and 14", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	now := time.Now().UTC()
+
+	if IsFirebaseEnabled() {
+		var docRef *firestore.DocumentRef
+		var fReq FirestoreBorrowRequest
+
+		doc, err := GetFirestore().Collection("borrow_requests").Doc(strconv.Itoa(req.RequestID)).Get(ctx)
+		if err == nil && doc.Exists() {
+			if doc.DataTo(&fReq) == nil {
+				docRef = doc.Ref
+			}
+		}
+		if docRef == nil {
+			iter := GetFirestore().Collection("borrow_requests").Where("id", "==", req.RequestID).Limit(1).Documents(ctx)
+			doc, err := iter.Next()
+			iter.Stop()
+			if err == nil && doc.Exists() {
+				if doc.DataTo(&fReq) == nil {
+					docRef = doc.Ref
+				}
+			}
+		}
+		if docRef == nil {
+			http.Error(w, "Borrow request not found", http.StatusNotFound)
+			return
+		}
+
+		if !strings.EqualFold(fReq.BorrowerUsername, uCtx.Username) {
+			http.Error(w, "Forbidden: Only the borrower can request an extension", http.StatusForbidden)
+			return
+		}
+
+		if fReq.ExtensionStatus == "pending" {
+			http.Error(w, "An extension request is already pending lender review", http.StatusBadRequest)
+			return
+		}
+
+		_, err = docRef.Update(ctx, []firestore.Update{
+			{Path: "extensionStatus", Value: "pending"},
+			{Path: "extensionRequestedDays", Value: req.Days},
+			{Path: "updatedAt", Value: now},
+		})
+		if err != nil {
+			http.Error(w, "Failed to update borrow request: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if fReq.ConversationID != nil {
+			sendSystemChatMessage(ctx, *fReq.ConversationID, uCtx.Username, fReq.LenderUsername,
+				fmt.Sprintf("⌛ @%s requested to extend borrowing by %d days. Lender can accept or decline.",
+					uCtx.Username, req.Days))
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Extension request sent to lender",
+			"status":  "pending",
+			"days":    req.Days,
+		})
+		return
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Extension request sent",
+			"status":  "pending",
+		})
+	}
+}
+
+func decideExtensionHandler(w http.ResponseWriter, r *http.Request) {
+	uCtx, ok := getUserFromContext(r)
+	if !ok || uCtx.Username == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req ExtensionDecisionInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RequestID <= 0 {
+		http.Error(w, "Invalid requestId", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	now := time.Now().UTC()
+
+	if IsFirebaseEnabled() {
+		var docRef *firestore.DocumentRef
+		var fReq FirestoreBorrowRequest
+
+		doc, err := GetFirestore().Collection("borrow_requests").Doc(strconv.Itoa(req.RequestID)).Get(ctx)
+		if err == nil && doc.Exists() {
+			if doc.DataTo(&fReq) == nil {
+				docRef = doc.Ref
+			}
+		}
+		if docRef == nil {
+			iter := GetFirestore().Collection("borrow_requests").Where("id", "==", req.RequestID).Limit(1).Documents(ctx)
+			doc, err := iter.Next()
+			iter.Stop()
+			if err == nil && doc.Exists() {
+				if doc.DataTo(&fReq) == nil {
+					docRef = doc.Ref
+				}
+			}
+		}
+		if docRef == nil {
+			http.Error(w, "Borrow request not found", http.StatusNotFound)
+			return
+		}
+
+		if !strings.EqualFold(fReq.LenderUsername, uCtx.Username) {
+			http.Error(w, "Forbidden: Only the lender can decide extension requests", http.StatusForbidden)
+			return
+		}
+
+		if fReq.ExtensionStatus != "pending" {
+			http.Error(w, "No pending extension request found for this transaction", http.StatusBadRequest)
+			return
+		}
+
+		if req.Accept {
+			extDays := fReq.ExtensionRequestedDays
+			if extDays <= 0 {
+				extDays = 3
+			}
+			baseDue := fReq.DueDate
+			if baseDue.IsZero() {
+				baseDue = now
+			}
+			newDueDate := baseDue.Add(time.Duration(extDays) * 24 * time.Hour)
+			newTotalDays := fReq.DurationDays + extDays
+
+			_, err = docRef.Update(ctx, []firestore.Update{
+				{Path: "status", Value: "extended"},
+				{Path: "extensionStatus", Value: "accepted"},
+				{Path: "dueDate", Value: newDueDate},
+				{Path: "durationDays", Value: newTotalDays},
+				{Path: "duration", Value: fmt.Sprintf("%d Days", newTotalDays)},
+				{Path: "updatedAt", Value: now},
+			})
+			if err != nil {
+				http.Error(w, "Failed to update borrow request: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			// Update borrowed_items
+			bIter := GetFirestore().Collection("borrowed_items").Where("borrowRequestId", "==", fReq.ID).Documents(ctx)
+			for {
+				bDoc, bErr := bIter.Next()
+				if bErr != nil {
+					break
+				}
+				_, _ = bDoc.Ref.Update(ctx, []firestore.Update{
+					{Path: "borrowedUntil", Value: newDueDate},
+					{Path: "daysLeft", Value: int(math.Ceil(newDueDate.Sub(now).Hours() / 24.0))},
+				})
+			}
+			bIter.Stop()
+
+			if fReq.ConversationID != nil {
+				sendSystemChatMessage(ctx, *fReq.ConversationID, uCtx.Username, fReq.BorrowerUsername,
+					fmt.Sprintf("🎉 @%s approved the extension (+%d days)! New return date: %s.",
+						uCtx.Username, extDays, newDueDate.Format("Jan 02, 2006")))
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"message": "Extension accepted successfully",
+				"status":  "extended",
+				"dueDate": newDueDate.Format("2006-01-02 15:04:05"),
+			})
+			return
+		} else {
+			// Decline
+			_, err = docRef.Update(ctx, []firestore.Update{
+				{Path: "extensionStatus", Value: "rejected"},
+				{Path: "updatedAt", Value: now},
+			})
+			if err != nil {
+				http.Error(w, "Failed to update borrow request: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if fReq.ConversationID != nil {
+				sendSystemChatMessage(ctx, *fReq.ConversationID, uCtx.Username, fReq.BorrowerUsername,
+					fmt.Sprintf("Extension request was declined. Return date remains: %s.",
+						fReq.DueDate.Format("Jan 02, 2006")))
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"message": "Extension declined",
+				"status":  fReq.Status,
+			})
+			return
+		}
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "Decision saved",
+			"status":  "updated",
+		})
+	}
+}
+
 
 func getConversationsHandler(w http.ResponseWriter, r *http.Request) {
 	uCtx, ok := getUserFromContext(r)
@@ -3182,17 +4186,17 @@ func getConversationsHandler(w http.ResponseWriter, r *http.Request) {
 						break
 					}
 					var fm FirestoreMessage
-					if mDoc.DataTo(&fm) == nil {
-						if fm.CreatedAt.After(latestTime) {
-							latestTime = fm.CreatedAt
-							latestContent = fm.Content
-						}
-						if !strings.EqualFold(fm.SenderUsername, uCtx.Username) && fm.ReadAt == nil {
-							unread++
-						}
+				if mDoc.DataTo(&fm) == nil {
+					if fm.CreatedAt.After(latestTime) {
+						latestTime = fm.CreatedAt
+						latestContent = fm.Content
+					}
+					if !strings.EqualFold(fm.SenderUsername, uCtx.Username) && fm.ReadAt == nil {
+						unread++
 					}
 				}
-				mIterTop.Stop()
+			}
+			mIterTop.Stop()
 			}
 
 			list[i].UnreadCount = unread
@@ -4626,42 +5630,100 @@ func endorseRecommendationHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func parseMomentData(docID string, data map[string]interface{}) (MohallaMoment, bool) {
+	if data == nil {
+		return MohallaMoment{}, false
+	}
+	var id int
+	switch v := data["id"].(type) {
+	case int64:
+		id = int(v)
+	case int:
+		id = v
+	case float64:
+		id = int(v)
+	case string:
+		id, _ = strconv.Atoi(v)
+	}
+	if id == 0 {
+		return MohallaMoment{}, false
+	}
+
+	var reqID int
+	switch v := data["borrowRequestId"].(type) {
+	case int64:
+		reqID = int(v)
+	case int:
+		reqID = v
+	case float64:
+		reqID = int(v)
+	}
+
+	getString := func(key string) string {
+		if v, ok := data[key].(string); ok {
+			return v
+		}
+		return ""
+	}
+
+	photos := []string{}
+	if rawPhotos, ok := data["photos"].([]interface{}); ok {
+		for _, p := range rawPhotos {
+			if ps, ok := p.(string); ok && ps != "" {
+				photos = append(photos, ps)
+			}
+		}
+	} else if rawStrPhotos, ok := data["photos"].([]string); ok {
+		photos = rawStrPhotos
+	}
+
+	createdAtStr := ""
+	if t, ok := data["createdAt"].(time.Time); ok {
+		createdAtStr = t.Format("2006-01-02 15:04:05")
+	} else if s, ok := data["createdAt"].(string); ok {
+		createdAtStr = s
+	}
+
+	return MohallaMoment{
+		ID:               id,
+		BorrowRequestID:  reqID,
+		BorrowerUsername: getString("borrowerUsername"),
+		LenderUsername:   getString("lenderUsername"),
+		ItemName:         getString("itemName"),
+		ItemCategory:     getString("itemCategory"),
+		UsageHeadline:    getString("usageHeadline"),
+		UsageDescription: getString("usageDescription"),
+		ThankYouMessage:  getString("thankYouMessage"),
+		Photos:           photos,
+		Area:             getString("area"),
+		CreatedAt:        createdAtStr,
+	}, true
+}
+
 func getMohallaMomentsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	ctx := r.Context()
 	moments := []MohallaMoment{}
 	totalBorrowed := 0
 
 	if IsFirebaseEnabled() {
-		iter := GetFirestore().Collection("moments").Documents(ctx)
-		defer iter.Stop()
-
+		seenIDs := make(map[int]bool)
+		iter := GetFirestore().Collection("mohalla_moments").Documents(ctx)
 		for {
 			doc, err := iter.Next()
 			if err != nil {
 				break
 			}
-			var fm FirestoreMohallaMoment
-			if err := doc.DataTo(&fm); err == nil {
-				if fm.Photos == nil {
-					fm.Photos = []string{}
-				}
-				moments = append(moments, MohallaMoment{
-					ID:               fm.ID,
-					BorrowRequestID:  fm.BorrowRequestID,
-					BorrowerUsername: fm.BorrowerUsername,
-					LenderUsername:   fm.LenderUsername,
-					ItemName:         fm.ItemName,
-					ItemCategory:     fm.ItemCategory,
-					UsageHeadline:    fm.UsageHeadline,
-					UsageDescription: fm.UsageDescription,
-					ThankYouMessage:  fm.ThankYouMessage,
-					Photos:           fm.Photos,
-					Area:             fm.Area,
-					CreatedAt:        fm.CreatedAt.Format("2006-01-02 15:04:05"),
-				})
+			m, ok := parseMomentData(doc.Ref.ID, doc.Data())
+			if ok && !seenIDs[m.ID] {
+				seenIDs[m.ID] = true
+				moments = append(moments, m)
 			}
 		}
+		iter.Stop()
 
 		sort.Slice(moments, func(i, j int) bool {
 			return moments[i].CreatedAt > moments[j].CreatedAt
@@ -4680,7 +5742,7 @@ func getMohallaMomentsHandler(w http.ResponseWriter, r *http.Request) {
 		if len(moments) > totalBorrowed {
 			totalBorrowed = len(moments)
 		}
-	} else {
+	} else if db != nil {
 		rows, err := db.Query(`SELECT id, borrow_request_id, borrower_username, lender_username, item_name, item_category, usage_headline, usage_description, thank_you_message, photos, area, created_at FROM mohalla_moments ORDER BY created_at DESC`)
 		if err != nil {
 			log.Printf("Error querying mohalla_moments: %v", err)
@@ -4723,6 +5785,14 @@ func getMohallaMomentsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	sort.Slice(moments, func(i, j int) bool {
+		return moments[i].CreatedAt > moments[j].CreatedAt
+	})
+
+	if len(moments) > totalBorrowed {
+		totalBorrowed = len(moments)
+	}
+
 	json.NewEncoder(w).Encode(MohallaMomentsResponse{
 		Moments:            moments,
 		TotalBorrowedCount: totalBorrowed,
@@ -4746,6 +5816,8 @@ func createMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
 	input.UsageHeadline = strings.TrimSpace(input.UsageHeadline)
 	input.UsageDescription = strings.TrimSpace(input.UsageDescription)
 	input.ThankYouMessage = strings.TrimSpace(input.ThankYouMessage)
+	input.ItemName = strings.TrimSpace(input.ItemName)
+	input.LenderUsername = strings.TrimSpace(input.LenderUsername)
 	input.ItemCategory = strings.TrimSpace(input.ItemCategory)
 	input.Area = strings.TrimSpace(input.Area)
 
@@ -4754,56 +5826,35 @@ func createMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if input.ItemName == "" {
+		input.ItemName = "Community Item"
+	}
+	if input.LenderUsername == "" {
+		input.LenderUsername = "neighbour"
+	}
+
 	ctx := r.Context()
-	var realLender, realItem, status string
-	var realReqID int
+	var realLender = input.LenderUsername
+	var realItem = input.ItemName
+	var realReqID = input.BorrowRequestID
 
 	if IsFirebaseEnabled() {
 		if input.BorrowRequestID > 0 {
 			iter := GetFirestore().Collection("borrow_requests").Where("id", "==", input.BorrowRequestID).Limit(1).Documents(ctx)
 			doc, err := iter.Next()
 			iter.Stop()
-			if err != nil {
-				http.Error(w, "No borrow request found matching this ID for your account", http.StatusNotFound)
-				return
-			}
-			var fReq FirestoreBorrowRequest
-			if err := doc.DataTo(&fReq); err != nil || !strings.EqualFold(fReq.BorrowerUsername, uCtx.Username) {
-				http.Error(w, "No borrow request found matching this ID for your account", http.StatusNotFound)
-				return
-			}
-			if fReq.Status != "accepted" {
-				http.Error(w, "Cannot create a Mohalla Moment: borrow request has not been accepted by the lender yet", http.StatusBadRequest)
-				return
-			}
-			realReqID = fReq.ID
-			realLender = fReq.LenderUsername
-			realItem = fReq.ItemName
-			status = fReq.Status
-		} else {
-			iter := GetFirestore().Collection("borrow_requests").Where("borrowerUsername", "==", uCtx.Username).Where("status", "==", "accepted").Documents(ctx)
-			var latestReq *FirestoreBorrowRequest
-			for {
-				doc, err := iter.Next()
-				if err != nil {
-					break
-				}
-				var fr FirestoreBorrowRequest
-				if doc.DataTo(&fr) == nil {
-					if latestReq == nil || fr.ID > latestReq.ID {
-						latestReq = &fr
+			if err == nil {
+				var fReq FirestoreBorrowRequest
+				if doc.DataTo(&fReq) == nil {
+					if fReq.LenderUsername != "" {
+						realLender = fReq.LenderUsername
 					}
+					if fReq.ItemName != "" {
+						realItem = fReq.ItemName
+					}
+					realReqID = fReq.ID
 				}
 			}
-			iter.Stop()
-			if latestReq == nil {
-				http.Error(w, "You must have an accepted borrow request from a neighbour before sharing a Mohalla Moment", http.StatusBadRequest)
-				return
-			}
-			realReqID = latestReq.ID
-			realLender = latestReq.LenderUsername
-			realItem = latestReq.ItemName
-			status = latestReq.Status
 		}
 
 		input.BorrowRequestID = realReqID
@@ -4855,7 +5906,7 @@ func createMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		now := time.Now().UTC()
-		mDocRef := GetFirestore().Collection("moments").NewDoc()
+		mDocRef := GetFirestore().Collection("mohalla_moments").NewDoc()
 		fMoment := FirestoreMohallaMoment{
 			ID:               momentID,
 			DocID:            mDocRef.ID,
@@ -4872,10 +5923,34 @@ func createMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
 			CreatedAt:        now,
 		}
 
+		// Persist directly to Firestore "mohalla_moments" collection
 		if _, err := mDocRef.Set(ctx, fMoment); err != nil {
-			log.Printf("Error creating Firestore moment: %v", err)
+			log.Printf("Error creating Firestore mohalla_moments: %v", err)
 			http.Error(w, "Failed to create moment: "+err.Error(), http.StatusInternalServerError)
 			return
+		}
+
+		momentObj := MohallaMoment{
+			ID:               fMoment.ID,
+			BorrowRequestID:  fMoment.BorrowRequestID,
+			BorrowerUsername: fMoment.BorrowerUsername,
+			LenderUsername:   fMoment.LenderUsername,
+			ItemName:         fMoment.ItemName,
+			ItemCategory:     fMoment.ItemCategory,
+			UsageHeadline:    fMoment.UsageHeadline,
+			UsageDescription: fMoment.UsageDescription,
+			ThankYouMessage:  fMoment.ThankYouMessage,
+			Photos:           fMoment.Photos,
+			Area:             fMoment.Area,
+			CreatedAt:        fMoment.CreatedAt.Format("2006-01-02 15:04:05"),
+		}
+
+		// Also persist to SQLite if enabled
+		if !isSQLiteFallbackDisabled() && db != nil {
+			photosJSON, _ := json.Marshal(savedPhotos)
+			_, _ = db.Exec(`INSERT INTO mohalla_moments (id, borrow_request_id, borrower_username, lender_username, item_name, item_category, usage_headline, usage_description, thank_you_message, photos, area, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				momentID, input.BorrowRequestID, uCtx.Username, input.LenderUsername, input.ItemName, input.ItemCategory, input.UsageHeadline, input.UsageDescription, input.ThankYouMessage, string(photosJSON), input.Area, momentObj.CreatedAt,
+			)
 		}
 
 		w.WriteHeader(http.StatusCreated)
@@ -4883,27 +5958,20 @@ func createMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
 			"success": true,
 			"id":      momentID,
 			"message": "Mohalla Moment published successfully",
+			"moment":  momentObj,
 		})
 		return
 	}
 
-	// SQLite fallback
+	// Pure SQLite fallback if Firebase is disabled
 	if input.BorrowRequestID > 0 {
-		err := db.QueryRow(`SELECT id, lender_username, item_name, status FROM borrow_requests WHERE id = ? AND borrower_username = ?`, input.BorrowRequestID, uCtx.Username).Scan(&realReqID, &realLender, &realItem, &status)
-		if err != nil {
-			http.Error(w, "No borrow request found matching this ID for your account", http.StatusNotFound)
-			return
+		var reqLender, reqItem string
+		_ = db.QueryRow(`SELECT lender_username, item_name FROM borrow_requests WHERE id = ?`, input.BorrowRequestID).Scan(&reqLender, &reqItem)
+		if reqLender != "" {
+			realLender = reqLender
 		}
-		if status != "accepted" {
-			http.Error(w, "Cannot create a Mohalla Moment: borrow request has not been accepted by the lender yet", http.StatusBadRequest)
-			return
-		}
-	} else {
-		// Attempt to link to their most recent accepted borrow request
-		err := db.QueryRow(`SELECT id, lender_username, item_name FROM borrow_requests WHERE borrower_username = ? AND status = 'accepted' ORDER BY id DESC LIMIT 1`, uCtx.Username).Scan(&realReqID, &realLender, &realItem)
-		if err != nil {
-			http.Error(w, "You must have an accepted borrow request from a neighbour before sharing a Mohalla Moment", http.StatusBadRequest)
-			return
+		if reqItem != "" {
+			realItem = reqItem
 		}
 	}
 
@@ -4931,7 +5999,6 @@ func createMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Persist uploaded photos to disk storage if base64
 	savedPhotos := []string{}
 	for _, p := range input.Photos {
 		p = strings.TrimSpace(p)
@@ -4949,39 +6016,10 @@ func createMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	photosJSON, _ := json.Marshal(savedPhotos)
+	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05")
 
-	if IsFirebaseEnabled() {
-		momentID := generateNumericID()
-		now := time.Now().UTC()
-		fMoment := FirestoreMohallaMoment{
-			ID:               momentID,
-			DocID:            strconv.Itoa(momentID),
-			BorrowRequestID:  input.BorrowRequestID,
-			BorrowerUsername: uCtx.Username,
-			LenderUsername:   input.LenderUsername,
-			ItemName:         input.ItemName,
-			ItemCategory:     input.ItemCategory,
-			UsageHeadline:    input.UsageHeadline,
-			UsageDescription: input.UsageDescription,
-			ThankYouMessage:  input.ThankYouMessage,
-			Photos:           savedPhotos,
-			Area:             input.Area,
-			CreatedAt:        now,
-		}
-		_, _ = GetFirestore().Collection("moments").Doc(fMoment.DocID).Set(r.Context(), fMoment)
-		if isSQLiteFallbackDisabled() {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"message": "Mohalla moment shared successfully",
-				"id":      momentID,
-			})
-			return
-		}
-	}
-
-	if !isSQLiteFallbackDisabled() && db != nil {
-		res, err := db.Exec(`INSERT INTO mohalla_moments (borrow_request_id, borrower_username, lender_username, item_name, item_category, usage_headline, usage_description, thank_you_message, photos, area) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	if db != nil {
+		res, err := db.Exec(`INSERT INTO mohalla_moments (borrow_request_id, borrower_username, lender_username, item_name, item_category, usage_headline, usage_description, thank_you_message, photos, area, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			input.BorrowRequestID,
 			uCtx.Username,
 			input.LenderUsername,
@@ -4992,22 +6030,293 @@ func createMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
 			input.ThankYouMessage,
 			string(photosJSON),
 			input.Area,
+			nowStr,
 		)
 		if err != nil {
 			http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		mID, _ := res.LastInsertId()
+		momentObj := MohallaMoment{
+			ID:               int(mID),
+			BorrowRequestID:  input.BorrowRequestID,
+			BorrowerUsername: uCtx.Username,
+			LenderUsername:   input.LenderUsername,
+			ItemName:         input.ItemName,
+			ItemCategory:     input.ItemCategory,
+			UsageHeadline:    input.UsageHeadline,
+			UsageDescription: input.UsageDescription,
+			ThankYouMessage:  input.ThankYouMessage,
+			Photos:           savedPhotos,
+			Area:             input.Area,
+			CreatedAt:        nowStr,
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"message": "Mohalla moment shared successfully",
+			"success": true,
 			"id":      mID,
+			"message": "Mohalla moment shared successfully",
+			"moment":  momentObj,
 		})
 		return
 	}
 
 	http.Error(w, "Database error: SQLite disabled and Firestore unavailable", http.StatusInternalServerError)
+}
+
+func deleteMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	uCtx, ok := getUserFromContext(r)
+	if !ok || uCtx == nil || uCtx.Username == "" {
+		http.Error(w, "Unauthorized: Please log in to delete a story", http.StatusUnauthorized)
+		return
+	}
+
+	idStr := strings.TrimSpace(r.URL.Query().Get("id"))
+	if idStr == "" {
+		var req struct {
+			ID interface{} `json:"id"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		switch v := req.ID.(type) {
+		case float64:
+			idStr = strconv.Itoa(int(v))
+		case int:
+			idStr = strconv.Itoa(v)
+		case string:
+			idStr = v
+		}
+	}
+
+	momentID, _ := strconv.Atoi(idStr)
+	if momentID == 0 {
+		http.Error(w, "Valid Story ID is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	if IsFirebaseEnabled() {
+		var targetDoc *firestore.DocumentRef
+		var borrower string
+
+		iter := GetFirestore().Collection("mohalla_moments").Where("id", "==", momentID).Limit(1).Documents(ctx)
+		doc, err := iter.Next()
+		iter.Stop()
+		if err == nil && doc.Exists() {
+			targetDoc = doc.Ref
+			data := doc.Data()
+			if b, ok := data["borrowerUsername"].(string); ok {
+				borrower = b
+			}
+		}
+
+		if targetDoc == nil {
+			http.Error(w, "Story not found", http.StatusNotFound)
+			return
+		}
+
+		if !strings.EqualFold(borrower, uCtx.Username) {
+			http.Error(w, "Forbidden: You can only delete your own stories", http.StatusForbidden)
+			return
+		}
+
+		if _, err := targetDoc.Delete(ctx); err != nil {
+			http.Error(w, "Failed to delete story: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if !isSQLiteFallbackDisabled() && db != nil {
+			_, _ = db.Exec("DELETE FROM mohalla_moments WHERE id = ?", momentID)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "Story deleted successfully",
+			"id":      momentID,
+		})
+		return
+	} else if db != nil {
+		var borrower string
+		err := db.QueryRow("SELECT borrower_username FROM mohalla_moments WHERE id = ?", momentID).Scan(&borrower)
+		if err != nil {
+			http.Error(w, "Story not found", http.StatusNotFound)
+			return
+		}
+		if !strings.EqualFold(borrower, uCtx.Username) {
+			http.Error(w, "Forbidden: You can only delete your own stories", http.StatusForbidden)
+			return
+		}
+		_, err = db.Exec("DELETE FROM mohalla_moments WHERE id = ?", momentID)
+		if err != nil {
+			http.Error(w, "Failed to delete story", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "Story deleted successfully",
+			"id":      momentID,
+		})
+		return
+	}
+
+	http.Error(w, "Database unavailable", http.StatusInternalServerError)
+}
+
+func updateMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	uCtx, ok := getUserFromContext(r)
+	if !ok || uCtx == nil || uCtx.Username == "" {
+		http.Error(w, "Unauthorized: Please log in to edit a story", http.StatusUnauthorized)
+		return
+	}
+
+	var input struct {
+		ID               int      `json:"id"`
+		ItemName         string   `json:"itemName"`
+		ItemCategory     string   `json:"itemCategory"`
+		UsageHeadline    string   `json:"usageHeadline"`
+		UsageDescription string   `json:"usageDescription"`
+		ThankYouMessage  string   `json:"thankYouMessage"`
+		Photos           []string `json:"photos"`
+		Area             string   `json:"area"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if input.ID == 0 {
+		http.Error(w, "Story ID is required", http.StatusBadRequest)
+		return
+	}
+
+	input.UsageHeadline = strings.TrimSpace(input.UsageHeadline)
+	input.UsageDescription = strings.TrimSpace(input.UsageDescription)
+	input.ThankYouMessage = strings.TrimSpace(input.ThankYouMessage)
+	input.ItemName = strings.TrimSpace(input.ItemName)
+	input.ItemCategory = strings.TrimSpace(input.ItemCategory)
+	input.Area = strings.TrimSpace(input.Area)
+
+	if input.UsageHeadline == "" || input.UsageDescription == "" {
+		http.Error(w, "Usage headline and description are required", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	if IsFirebaseEnabled() {
+		iter := GetFirestore().Collection("mohalla_moments").Where("id", "==", input.ID).Limit(1).Documents(ctx)
+		doc, err := iter.Next()
+		iter.Stop()
+		if err != nil || !doc.Exists() {
+			http.Error(w, "Story not found", http.StatusNotFound)
+			return
+		}
+
+		data := doc.Data()
+		borrower := ""
+		if b, ok := data["borrowerUsername"].(string); ok {
+			borrower = b
+		}
+		if !strings.EqualFold(borrower, uCtx.Username) {
+			http.Error(w, "Forbidden: You can only edit your own stories", http.StatusForbidden)
+			return
+		}
+
+		savedPhotos := []string{}
+		for idx, p := range input.Photos {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			if strings.HasPrefix(p, "data:") {
+				storageURL, err := GetStorageProvider().SaveDataURL(ctx, p, "moments", strconv.Itoa(input.ID), fmt.Sprintf("moment-%d", idx))
+				if err == nil && storageURL != "" {
+					savedPhotos = append(savedPhotos, storageURL)
+					continue
+				}
+			}
+			savedPhotos = append(savedPhotos, p)
+		}
+
+		updates := []firestore.Update{
+			{Path: "usageHeadline", Value: input.UsageHeadline},
+			{Path: "usageDescription", Value: input.UsageDescription},
+			{Path: "thankYouMessage", Value: input.ThankYouMessage},
+		}
+		if input.ItemName != "" {
+			updates = append(updates, firestore.Update{Path: "itemName", Value: input.ItemName})
+		}
+		if input.ItemCategory != "" {
+			updates = append(updates, firestore.Update{Path: "itemCategory", Value: input.ItemCategory})
+		}
+		if input.Area != "" {
+			updates = append(updates, firestore.Update{Path: "area", Value: input.Area})
+		}
+		if input.Photos != nil {
+			updates = append(updates, firestore.Update{Path: "photos", Value: savedPhotos})
+		}
+
+		if _, err := doc.Ref.Update(ctx, updates); err != nil {
+			http.Error(w, "Failed to update story: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if !isSQLiteFallbackDisabled() && db != nil {
+			photosJSON, _ := json.Marshal(savedPhotos)
+			_, _ = db.Exec("UPDATE mohalla_moments SET item_name=?, item_category=?, usage_headline=?, usage_description=?, thank_you_message=?, photos=?, area=? WHERE id=?",
+				input.ItemName, input.ItemCategory, input.UsageHeadline, input.UsageDescription, input.ThankYouMessage, string(photosJSON), input.Area, input.ID,
+			)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "Story updated successfully",
+			"id":      input.ID,
+		})
+		return
+	} else if db != nil {
+		var borrower string
+		err := db.QueryRow("SELECT borrower_username FROM mohalla_moments WHERE id = ?", input.ID).Scan(&borrower)
+		if err != nil {
+			http.Error(w, "Story not found", http.StatusNotFound)
+			return
+		}
+		if !strings.EqualFold(borrower, uCtx.Username) {
+			http.Error(w, "Forbidden: You can only edit your own stories", http.StatusForbidden)
+			return
+		}
+		photosJSON, _ := json.Marshal(input.Photos)
+		_, err = db.Exec("UPDATE mohalla_moments SET item_name=?, item_category=?, usage_headline=?, usage_description=?, thank_you_message=?, photos=?, area=? WHERE id=?",
+			input.ItemName, input.ItemCategory, input.UsageHeadline, input.UsageDescription, input.ThankYouMessage, string(photosJSON), input.Area, input.ID,
+		)
+		if err != nil {
+			http.Error(w, "Failed to update story", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "Story updated successfully",
+			"id":      input.ID,
+		})
+		return
+	}
+
+	http.Error(w, "Database unavailable", http.StatusInternalServerError)
 }
 
 func main() {
@@ -5105,7 +6414,7 @@ func main() {
 				w.Header().Set("Access-Control-Allow-Origin", "*")
 			}
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, Cache-Control, Pragma, *")
 			w.Header().Set("Access-Control-Max-Age", "86400")
 			w.Header().Set("Vary", "Origin")
 
@@ -5158,7 +6467,12 @@ func main() {
 	})))
 	http.HandleFunc("/api/borrow-requests/accept", corsMiddleware(JWTMiddleware(acceptBorrowRequestHandler)))
 	http.HandleFunc("/api/borrow-requests/reject", corsMiddleware(JWTMiddleware(rejectBorrowRequestHandler)))
+	http.HandleFunc("/api/borrow-requests/handover", corsMiddleware(JWTMiddleware(confirmHandoverHandler)))
+	http.HandleFunc("/api/borrow-requests/return", corsMiddleware(JWTMiddleware(returnItemHandler)))
+	http.HandleFunc("/api/borrow-requests/extend", corsMiddleware(JWTMiddleware(requestExtensionHandler)))
+	http.HandleFunc("/api/borrow-requests/extend-decision", corsMiddleware(JWTMiddleware(decideExtensionHandler)))
 	http.HandleFunc("/api/conversations", corsMiddleware(JWTMiddleware(getConversationsHandler)))
+
 	http.HandleFunc("/api/conversations/messages", corsMiddleware(JWTMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			getMessagesHandler(w, r)
@@ -5193,10 +6507,16 @@ func main() {
 			getMohallaMomentsHandler(w, r)
 		} else if r.Method == http.MethodPost {
 			JWTMiddleware(createMohallaMomentHandler)(w, r)
+		} else if r.Method == http.MethodPut {
+			JWTMiddleware(updateMohallaMomentHandler)(w, r)
+		} else if r.Method == http.MethodDelete {
+			JWTMiddleware(deleteMohallaMomentHandler)(w, r)
 		} else {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))
+	http.HandleFunc("/api/moments/delete", corsMiddleware(JWTMiddleware(deleteMohallaMomentHandler)))
+	http.HandleFunc("/api/moments/update", corsMiddleware(JWTMiddleware(updateMohallaMomentHandler)))
 
 	// Firebase status & connectivity verification endpoint (Phase 1)
 	http.HandleFunc("/api/firebase/status", corsMiddleware(func(w http.ResponseWriter, r *http.Request) {

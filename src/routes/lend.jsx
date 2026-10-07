@@ -12,6 +12,8 @@ import {
   resetSessionExpiredOnStartupFlag,
 } from "@/lib/auth";
 import { apiUrl } from "@/lib/api";
+import { backStack } from "@/lib/backStack";
+import { uploadImage } from "@/lib/storage";
 
 export const Route = createFileRoute("/lend")({
   head: () => ({
@@ -37,22 +39,24 @@ export function LendPage({ onBack }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (didSessionExpireOnStartup()) {
-      resetSessionExpiredOnStartupFlag();
-      setAuthTriggerMsg("Your session has expired. Please log in again.");
-      setAuthInitialMode("login");
-      setShowAuthModal(true);
+    if (showAuthModal) {
+      backStack.push("lend_auth", () => {
+        setShowAuthModal(false);
+      });
+    } else {
+      if (backStack.has("lend_auth")) {
+        backStack.pop("lend_auth");
+      }
     }
+  }, [showAuthModal]);
 
+  useEffect(() => {
     const handleAuthChange = (e) => {
       setCurrentUser(e.detail || null);
     };
 
-    const handleSessionExpired = (e) => {
+    const handleSessionExpired = () => {
       setCurrentUser(null);
-      setAuthTriggerMsg("Your session has expired. Please log in again.");
-      setAuthInitialMode("login");
-      setShowAuthModal(true);
     };
 
     window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
@@ -87,6 +91,8 @@ export function LendPage({ onBack }) {
   }, [currentUser]);
 
   const [imagePreview, setImagePreview] = useState(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -132,11 +138,21 @@ export function LendPage({ onBack }) {
       return;
     }
     try {
-      const dataUrl = await compressImage(file);
-      setImagePreview(dataUrl);
       setErrorMessage("");
-    } catch {
-      setErrorMessage("Could not read that photo. Please try another image.");
+      // Immediate local preview so the user sees their photo right away
+      const localPreview = URL.createObjectURL(file);
+      setImagePreview(localPreview);
+
+      // Upload directly to Cloudinary using unsigned preset
+      setIsUploadingImage(true);
+      const secureUrl = await uploadImage(file);
+      setUploadedImageUrl(secureUrl);
+      setImagePreview(secureUrl);
+    } catch (err) {
+      console.error("Cloudinary upload failed:", err);
+      setErrorMessage(err.message || "Could not upload photo. Please try again.");
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -173,7 +189,13 @@ export function LendPage({ onBack }) {
       return;
     }
 
-    if (!imagePreview) {
+    if (isUploadingImage) {
+      setErrorMessage("Photo is still uploading to Cloudinary, please wait a moment...");
+      return;
+    }
+
+    const finalImageUrl = uploadedImageUrl || imagePreview;
+    if (!finalImageUrl) {
       setErrorMessage("Please upload a photo of the item so neighbours can see it.");
       return;
     }
@@ -198,7 +220,7 @@ export function LendPage({ onBack }) {
           phone: formData.phone.trim() || currentUser.phone || "",
           duration: formData.duration,
           condition: formData.condition,
-          imageUrl: imagePreview || "",
+          imageUrl: finalImageUrl || "",
         }),
       });
 
@@ -238,7 +260,13 @@ export function LendPage({ onBack }) {
     <div className="min-h-screen bg-[#07080c] text-white p-4 sm:p-8 md:p-12 relative overflow-hidden flex flex-col items-center justify-center font-sans">
       <AuthModal
         isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
+        onClose={() => {
+          if (backStack.has("lend_auth")) {
+            backStack.pop("lend_auth", () => setShowAuthModal(false));
+          } else {
+            setShowAuthModal(false);
+          }
+        }}
         initialMode={authInitialMode}
         triggerMsg={authTriggerMsg || "You need an account & shelf to lend items to your Mohalla."}
         onSuccess={(session) => {
@@ -353,10 +381,19 @@ export function LendPage({ onBack }) {
                           alt="Uploaded Item"
                           className="max-h-80 sm:max-h-96 max-w-full rounded-2xl object-contain shadow-2xl border border-white/20"
                         />
+                        {isUploadingImage && (
+                          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center gap-2 rounded-2xl z-10">
+                            <span className="w-8 h-8 border-3 border-teal-200 border-t-transparent rounded-full animate-spin" />
+                            <span className="text-[11px] font-mono text-teal-100 uppercase tracking-wider">Uploading to Cloudinary...</span>
+                          </div>
+                        )}
                         <button
                           type="button"
-                          onClick={() => setImagePreview(null)}
-                          className="absolute top-2 right-2 bg-black/80 hover:bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-xs transition-colors cursor-pointer"
+                          onClick={() => {
+                            setImagePreview(null);
+                            setUploadedImageUrl(null);
+                          }}
+                          className="absolute top-2 right-2 bg-black/80 hover:bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-xs transition-colors cursor-pointer z-20"
                         >
                           ✕
                         </button>
@@ -409,7 +446,10 @@ export function LendPage({ onBack }) {
                     <button
                       type="button"
                       title="Clear / Reset"
-                      onClick={() => setImagePreview(null)}
+                      onClick={() => {
+                        setImagePreview(null);
+                        setUploadedImageUrl(null);
+                      }}
                       className="w-11 h-11 rounded-2xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-300 font-bold flex items-center justify-center transition-all cursor-pointer shadow-md text-sm"
                     >
                       →
@@ -560,7 +600,7 @@ export function LendPage({ onBack }) {
               {/* Submit CTA Button */}
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingImage}
                 className="btn-peek w-full mt-2 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
@@ -568,8 +608,13 @@ export function LendPage({ onBack }) {
                     <span className="w-4 h-4 border-2 border-teal-200 border-t-transparent rounded-full animate-spin" />
                     <span>SAVING ITEM TO MOHALLA STORE...</span>
                   </>
+                ) : isUploadingImage ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-amber-300 border-t-transparent rounded-full animate-spin" />
+                    <span>UPLOADING PHOTO TO CLOUDINARY...</span>
+                  </>
                 ) : (
-                  <span>LIST ITEM ON MOHALLA STORE</span>
+                  <span>LIST ITEM ON MOHALLA STORE →</span>
                 )}
               </button>
             </div>

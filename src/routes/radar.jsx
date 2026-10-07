@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import React, { useState, useEffect, useRef } from "react";
 import { apiUrl } from "@/lib/api";
 import { getStoredUser } from "@/lib/auth";
@@ -25,6 +25,18 @@ export function MohallaRadarPage() {
   const [radarItems, setRadarItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleMobileNav = (tabId) => {
+    setMobileMenuOpen(false);
+    if (tabId === "radar") {
+      return;
+    }
+    navigate({
+      to: "/peek",
+      search: { tab: tabId, panel: "open" },
+    });
+  };
 
   // Exact real coordinates (default: Ekta Square base coords)
   const storedUser = typeof window !== "undefined" ? getStoredUser() : null;
@@ -288,7 +300,7 @@ export function MohallaRadarPage() {
   return (
     <div className="h-screen w-screen bg-[#07080c] text-white flex flex-col font-sans relative overflow-hidden">
       {/* 1. TOP NAVBAR (Matching Panel Navbar Exactly) */}
-      <header className="sticky top-0 z-40 bg-[#141418]/95 backdrop-blur-xl border-b border-neutral-800/80 px-4 sm:px-10 md:px-12 py-3.5 sm:py-4 flex items-center justify-between shrink-0 shadow-sm">
+      <header className="sticky top-0 relative z-[100] bg-[#141418]/95 backdrop-blur-xl border-b border-neutral-800/80 px-4 sm:px-10 md:px-12 py-3.5 sm:py-4 flex items-center justify-between shrink-0 shadow-sm">
         {/* Brand Logo & Title */}
         <div className="flex items-center gap-3">
           <Link
@@ -363,7 +375,7 @@ export function MohallaRadarPage() {
           </Link>
           <button
             type="button"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
             className="md:hidden w-8 h-8 rounded-full bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer text-xs"
             aria-label="Toggle Navigation Menu"
           >
@@ -373,55 +385,60 @@ export function MohallaRadarPage() {
 
         {/* Mobile Navigation Dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden absolute top-full left-0 right-0 z-50 bg-[#141418]/98 backdrop-blur-2xl border-b border-neutral-800 p-4 flex flex-col gap-2 shadow-2xl">
-            <Link
-              to="/peek"
-              search={{ tab: "explore", panel: "open" }}
-              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
+          <>
+            {/* Backdrop for closing dropdown when tapping outside on phone */}
+            <div
+              className="md:hidden fixed inset-0 top-[57px] z-[100] bg-black/60 backdrop-blur-xs"
               onClick={() => setMobileMenuOpen(false)}
-            >
-              Explore your Mohalla
-            </Link>
-            <Link
-              to="/peek"
-              search={{ tab: "stories", panel: "open" }}
-              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Mohalla Stories
-            </Link>
-            <Link
-              to="/peek"
-              search={{ tab: "recommendations", panel: "open" }}
-              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Recommendations
-            </Link>
-            <Link
-              to="/peek"
-              search={{ tab: "messages", panel: "open" }}
-              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Messages
-            </Link>
-            <Link
-              to="/peek"
-              search={{ tab: "profile", panel: "open" }}
-              className="text-left text-xs font-mono py-2 px-3 rounded-lg text-neutral-300 hover:bg-neutral-800 transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Profile
-            </Link>
-            <Link
-              to="/radar"
-              className="text-left text-xs font-mono py-2 px-3 rounded-lg bg-[#09414b] text-teal-100 font-bold border border-[#0c5360] transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Mohalla Radar
-            </Link>
-          </div>
+              aria-hidden="true"
+            />
+
+            <div className="md:hidden absolute top-full left-0 right-0 z-[105] bg-[#141418] border-b border-neutral-800 p-4 flex flex-col gap-1.5 shadow-2xl pointer-events-auto">
+              <button
+                type="button"
+                onClick={() => handleMobileNav("explore")}
+                className="w-full text-left text-xs font-mono py-2.5 px-3.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800/80 active:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                Explore your Mohalla
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMobileNav("stories")}
+                className="w-full text-left text-xs font-mono py-2.5 px-3.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800/80 active:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                Mohalla Stories
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMobileNav("recommendations")}
+                className="w-full text-left text-xs font-mono py-2.5 px-3.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800/80 active:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                Recommendations
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMobileNav("messages")}
+                className="w-full text-left text-xs font-mono py-2.5 px-3.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800/80 active:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                Messages
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMobileNav("profile")}
+                className="w-full text-left text-xs font-mono py-2.5 px-3.5 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800/80 active:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMobileNav("radar")}
+                className="w-full text-left text-xs font-mono py-2.5 px-3.5 rounded-lg bg-[#09414b] text-teal-100 font-bold border border-[#0c5360] transition-colors cursor-pointer flex items-center justify-between"
+              >
+                <span>Mohalla Radar</span>
+                <span className="text-[10px] text-teal-300 uppercase tracking-widest font-sans font-semibold">Active</span>
+              </button>
+            </div>
+          </>
         )}
       </header>
 

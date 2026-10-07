@@ -82,7 +82,7 @@ export default function BorrowedProfile({ currentUser, onLocationUpdated, onOpen
         }));
         
         setBorrowedItems(dbBorrowed);
-        setLentItems(data.listings && data.listings.length > 0 ? data.listings : (data.lent || []));
+        setLentItems(Array.isArray(data.listings) ? data.listings : (data.lent || []));
         setProfileMeta({
           fullName: data.fullName || currentUser?.username || "",
           bio: data.bio || "",

@@ -16,6 +16,7 @@ import {
   resetSessionExpiredOnStartupFlag,
 } from "@/lib/auth";
 import { apiUrl, wsUrl } from "@/lib/api";
+import { backStack } from "@/lib/backStack";
 
 function resolveItemImage(item) {
   const raw = String(item?.imageUrl || item?.image_url || item?.image || "").trim();
@@ -49,6 +50,10 @@ function formatLendDuration(dur) {
 }
 
 export const Route = createFileRoute("/peek")({
+  validateSearch: (search) => ({
+    tab: search?.tab || "",
+    panel: search?.panel || "",
+  }),
   head: () => ({
     meta: [
       { title: "mohalla store" },
@@ -63,30 +68,21 @@ export const Route = createFileRoute("/peek")({
 
 function RepositoryOfRemnantsPage() {
   const location = useLocation();
+  const search = Route.useSearch();
 
   const [currentUser, setCurrentUser] = useState(() => getStoredUser());
   const [authTriggerMsg, setAuthTriggerMsg] = useState("");
   const [authInitialMode, setAuthInitialMode] = useState("login");
+  const [pendingActionAfterAuth, setPendingActionAfterAuth] = useState(null);
 
   useEffect(() => {
-    // If expired session was detected during initial startup, prompt user to login
-    if (didSessionExpireOnStartup()) {
-      resetSessionExpiredOnStartupFlag();
-      setAuthTriggerMsg("Your session has expired. Please log in again.");
-      setAuthInitialMode("login");
-      setShowAuthModal(true);
-    }
-
     const handleAuthChange = (e) => {
       setCurrentUser(e.detail || null);
     };
 
-    const handleSessionExpired = (e) => {
+    const handleSessionExpired = () => {
       setCurrentUser(null);
       setProfileData(null);
-      setAuthTriggerMsg("Your session has expired. Please log in again.");
-      setAuthInitialMode("login");
-      setShowAuthModal(true);
     };
 
     window.addEventListener(AUTH_CHANGE_EVENT, handleAuthChange);
@@ -100,6 +96,10 @@ function RepositoryOfRemnantsPage() {
 
   const [activeItem, setActiveItem] = useState(null);
   const [panelOpen, setPanelOpen] = useState(() => {
+    if (search?.panel === "open") return true;
+    if (search?.tab && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(search.tab)) {
+      return true;
+    }
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("panel") === "open") return true;
@@ -108,13 +108,44 @@ function RepositoryOfRemnantsPage() {
         return true;
       }
     }
+    if (location?.search) {
+      if (location.search.panel === "open") return true;
+      if (location.search.tab && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(location.search.tab)) {
+        return true;
+      }
+    }
     return false;
   });
   const [isAnimating, setIsAnimating] = useState(false);
   const panelRef = useRef(null);
 
+  const handleClosePanelInternal = () => {
+    setIsAnimating(true);
+    if (panelRef.current) {
+      const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+      panelRef.current.style.transform = "translateY(0px)";
+      void panelRef.current.offsetHeight;
+      panelRef.current.style.transition = "transform 0.72s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.72s ease";
+      panelRef.current.style.transform = `translateY(${vh - 40}px)`;
+    }
+    setTimeout(() => {
+      setPanelOpen(false);
+      setIsAnimating(false);
+      if (panelRef.current) {
+        panelRef.current.style.transition = "";
+        panelRef.current.style.transform = "";
+        panelRef.current.scrollTop = 0;
+      }
+      document.body.style.overflow = "";
+      window.scrollTo(0, 0);
+    }, 720);
+  };
+
   const handleOpenPanel = (tab = null) => {
     if (tab) setActiveNavTab(tab);
+    backStack.push("panel", () => {
+      handleClosePanelInternal();
+    });
     setIsAnimating(true);
     if (panelRef.current) {
       const vh = typeof window !== "undefined" ? window.innerHeight : 800;
@@ -138,30 +169,19 @@ function RepositoryOfRemnantsPage() {
   };
 
   const handleClosePanel = () => {
-    setIsAnimating(true);
-    if (panelRef.current) {
-      const vh = typeof window !== "undefined" ? window.innerHeight : 800;
-      panelRef.current.style.transform = "translateY(0px)";
-      void panelRef.current.offsetHeight;
-      panelRef.current.style.transition = "transform 0.72s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.72s ease";
-      panelRef.current.style.transform = `translateY(${vh - 40}px)`;
+    if (backStack.has("panel")) {
+      backStack.pop("panel", handleClosePanelInternal);
+    } else {
+      handleClosePanelInternal();
     }
-    setTimeout(() => {
-      setPanelOpen(false);
-      setIsAnimating(false);
-      if (panelRef.current) {
-        panelRef.current.style.transition = "";
-        panelRef.current.style.transform = "";
-        panelRef.current.scrollTop = 0;
-      }
-      document.body.style.overflow = "";
-      window.scrollTo(0, 0);
-    }, 720);
   };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeNavTab, setActiveNavTab] = useState(() => {
+    if (search?.tab && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(search.tab)) {
+      return search.tab;
+    }
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const t = params.get("tab");
@@ -169,22 +189,22 @@ function RepositoryOfRemnantsPage() {
         return t;
       }
     }
+    if (location?.search?.tab && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(location.search.tab)) {
+      return location.search.tab;
+    }
     return "explore";
   });
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const t = params.get("tab") || (location?.search && location.search.tab);
-      const isPanelOpenParam = params.get("panel") === "open" || (location?.search && location.search.panel === "open");
-      if (t && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(t)) {
-        setActiveNavTab(t);
-        setPanelOpen(true);
-      } else if (isPanelOpenParam) {
-        setPanelOpen(true);
-      }
+    const t = search?.tab || (location?.search && location.search.tab);
+    const isPanelOpenParam = search?.panel === "open" || (location?.search && location.search.panel === "open");
+    if (t && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(t)) {
+      setActiveNavTab(t);
+      setPanelOpen(true);
+    } else if (isPanelOpenParam) {
+      setPanelOpen(true);
     }
-  }, [location?.search, location?.searchStr, location?.href]);
+  }, [search?.tab, search?.panel, location?.search, location?.searchStr, location?.href]);
 
   const [showFlyer, setShowFlyer] = useState(false);
   const [dbItems, setDbItems] = useState({});
@@ -271,7 +291,11 @@ function RepositoryOfRemnantsPage() {
   }, []);
 
   const handleDismissFlyer = () => {
-    setShowFlyer(false);
+    if (backStack.has("flyer")) {
+      backStack.pop("flyer", () => setShowFlyer(false));
+    } else {
+      setShowFlyer(false);
+    }
     try {
       localStorage.setItem("mohalla_flyer_seen", "true");
     } catch {}
@@ -285,7 +309,7 @@ function RepositoryOfRemnantsPage() {
   const [isSendingBorrowRequest, setIsSendingBorrowRequest] = useState(false);
   const [isClosingBorrowPanel, setIsClosingBorrowPanel] = useState(false);
 
-  const handleCloseBorrowPanel = () => {
+  const handleCloseBorrowPanelInternal = () => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setIsClosingBorrowPanel(true);
       setTimeout(() => {
@@ -299,6 +323,14 @@ function RepositoryOfRemnantsPage() {
     }
   };
 
+  const handleCloseBorrowPanel = () => {
+    if (backStack.has("borrow")) {
+      backStack.pop("borrow", handleCloseBorrowPanelInternal);
+    } else {
+      handleCloseBorrowPanelInternal();
+    }
+  };
+
   useEffect(() => {
     if (borrowingItemKey && typeof window !== "undefined" && window.innerWidth < 768) {
       document.body.style.overflow = "hidden";
@@ -308,9 +340,74 @@ function RepositoryOfRemnantsPage() {
     }
   }, [borrowingItemKey]);
 
+  // Back stack registration for Borrow panel
+  useEffect(() => {
+    if (borrowingItemKey) {
+      backStack.push("borrow", () => {
+        handleCloseBorrowPanelInternal();
+      });
+    } else {
+      if (backStack.has("borrow")) {
+        backStack.pop("borrow");
+      }
+    }
+  }, [borrowingItemKey]);
+
   // Authentication & Profile Modals
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+
+  // Back stack registration for Edit Profile Modal
+  useEffect(() => {
+    if (showEditProfileModal) {
+      backStack.push("editProfile", () => {
+        setShowEditProfileModal(false);
+      });
+    } else {
+      if (backStack.has("editProfile")) {
+        backStack.pop("editProfile");
+      }
+    }
+  }, [showEditProfileModal]);
+
+  // Back stack registration for Auth Modal
+  useEffect(() => {
+    if (showAuthModal) {
+      backStack.push("auth", () => {
+        setShowAuthModal(false);
+      });
+    } else {
+      if (backStack.has("auth")) {
+        backStack.pop("auth");
+      }
+    }
+  }, [showAuthModal]);
+
+  // Back stack registration for Flyer
+  useEffect(() => {
+    if (showFlyer) {
+      backStack.push("flyer", () => {
+        setShowFlyer(false);
+      });
+    } else {
+      if (backStack.has("flyer")) {
+        backStack.pop("flyer");
+      }
+    }
+  }, [showFlyer]);
+
+  // Back stack registration for Tabs (navigating back to explore)
+  useEffect(() => {
+    if (activeNavTab !== "explore") {
+      backStack.push("tab_nav", () => {
+        setActiveNavTab("explore");
+      });
+    } else {
+      if (backStack.has("tab_nav")) {
+        backStack.pop("tab_nav");
+      }
+    }
+  }, [activeNavTab]);
 
   // Real Profile State
   const [profileData, setProfileData] = useState(null);
@@ -325,6 +422,8 @@ function RepositoryOfRemnantsPage() {
   const [chatInput, setChatInput] = useState("");
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [showExtensionPicker, setShowExtensionPicker] = useState(false);
+
 
   const fetchProfile = async () => {
     if (!currentUser?.token) {
@@ -360,6 +459,39 @@ function RepositoryOfRemnantsPage() {
   const [deletingItemId, setDeletingItemId] = useState(null);
   const [itemToDelete, setItemToDelete] = useState(null);
   const [deleteItemFeedback, setDeleteItemFeedback] = useState(null);
+
+  // Back stack registration for Chat
+  useEffect(() => {
+    if (activeChatId) {
+      backStack.push("chat", () => {
+        setActiveChatId(null);
+      });
+    } else {
+      if (backStack.has("chat")) {
+        backStack.pop("chat");
+      }
+    }
+  }, [activeChatId]);
+
+  // Back stack registration for Delete Lent Item Confirmation Modal
+  useEffect(() => {
+    if (itemToDelete) {
+      backStack.push("deleteItem", () => {
+        setItemToDelete(null);
+      });
+    } else {
+      if (backStack.has("deleteItem")) {
+        backStack.pop("deleteItem");
+      }
+    }
+  }, [itemToDelete]);
+
+  // Clear back stack on unmount
+  useEffect(() => {
+    return () => {
+      backStack.clear();
+    };
+  }, []);
 
   const handleDeleteLentItem = async (item) => {
     if (!item?.id || !currentUser?.token) return;
@@ -483,7 +615,11 @@ function RepositoryOfRemnantsPage() {
         body: JSON.stringify({ requestId }),
       });
       if (res.ok) {
-        await Promise.all([fetchBorrowRequests(), fetchConversations()]);
+        const data = await res.json().catch(() => ({}));
+        await Promise.all([fetchBorrowRequests(), fetchConversations(), fetchDbItems(), fetchProfile()]);
+        if (data.conversationId) {
+          setActiveChatId(data.conversationId);
+        }
       } else {
         const txt = await res.text();
         alert(txt || "Failed to accept borrow request.");
@@ -509,7 +645,7 @@ function RepositoryOfRemnantsPage() {
         body: JSON.stringify({ requestId }),
       });
       if (res.ok) {
-        await fetchBorrowRequests();
+        await Promise.all([fetchBorrowRequests(), fetchConversations(), fetchDbItems()]);
       } else {
         const txt = await res.text();
         alert(txt || "Failed to decline borrow request.");
@@ -521,6 +657,116 @@ function RepositoryOfRemnantsPage() {
       setIsProcessingRequestId(null);
     }
   };
+
+  const handleConfirmHandover = async (requestId, received) => {
+    if (!currentUser?.token || !requestId) return;
+    setIsProcessingRequestId(requestId);
+    try {
+      const res = await fetch(apiUrl("/api/borrow-requests/handover"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+        body: JSON.stringify({ requestId, received }),
+      });
+      if (res.ok) {
+        await Promise.all([fetchBorrowRequests(), fetchConversations(), fetchDbItems(), fetchProfile()]);
+        if (activeChatId) fetchMessages(activeChatId);
+      } else {
+        const txt = await res.text();
+        alert(txt || "Failed to update handover status.");
+      }
+    } catch (err) {
+      console.error("Error confirming handover:", err);
+      alert("Network error confirming handover.");
+    } finally {
+      setIsProcessingRequestId(null);
+    }
+  };
+
+  const handleConfirmReturn = async (requestId, returned) => {
+    if (!currentUser?.token || !requestId) return;
+    setIsProcessingRequestId(requestId);
+    try {
+      const res = await fetch(apiUrl("/api/borrow-requests/return"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+        body: JSON.stringify({ requestId, returned }),
+      });
+      if (res.ok) {
+        await Promise.all([fetchBorrowRequests(), fetchConversations(), fetchDbItems(), fetchProfile()]);
+        if (activeChatId) fetchMessages(activeChatId);
+      } else {
+        const txt = await res.text();
+        alert(txt || "Failed to update return status.");
+      }
+    } catch (err) {
+      console.error("Error confirming return:", err);
+      alert("Network error confirming return.");
+    } finally {
+      setIsProcessingRequestId(null);
+    }
+  };
+
+  const handleRequestExtension = async (requestId, days) => {
+    if (!currentUser?.token || !requestId) return;
+    setIsProcessingRequestId(requestId);
+    try {
+      const res = await fetch(apiUrl("/api/borrow-requests/extend"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+        body: JSON.stringify({ requestId, days: Number(days) }),
+      });
+      if (res.ok) {
+        await Promise.all([fetchBorrowRequests(), fetchConversations()]);
+        if (activeChatId) fetchMessages(activeChatId);
+        setShowExtensionPicker(false);
+      } else {
+        const txt = await res.text();
+        alert(txt || "Failed to request extension.");
+      }
+    } catch (err) {
+      console.error("Error requesting extension:", err);
+      alert("Network error requesting extension.");
+    } finally {
+      setIsProcessingRequestId(null);
+    }
+  };
+
+  const handleDecideExtension = async (requestId, accept) => {
+    if (!currentUser?.token || !requestId) return;
+    setIsProcessingRequestId(requestId);
+    try {
+      const res = await fetch(apiUrl("/api/borrow-requests/extend-decision"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentUser.token}`,
+        },
+        body: JSON.stringify({ requestId, accept }),
+      });
+      if (res.ok) {
+        await Promise.all([fetchBorrowRequests(), fetchConversations(), fetchDbItems(), fetchProfile()]);
+        if (activeChatId) fetchMessages(activeChatId);
+      } else {
+        const txt = await res.text();
+        alert(txt || "Failed to update extension decision.");
+      }
+    } catch (err) {
+      console.error("Error updating extension decision:", err);
+      alert("Network error updating extension decision.");
+    } finally {
+      setIsProcessingRequestId(null);
+    }
+  };
+
 
   useEffect(() => {
     if (activeNavTab === "messages") {
@@ -631,6 +877,8 @@ function RepositoryOfRemnantsPage() {
           itemName: item.title,
           lender: item.rawUsername || item.owner,
           note: `Requesting to borrow for dates: Sep ${selectedBorrowDates.join(", ")}`,
+          durationDays: selectedBorrowDates.length > 0 ? selectedBorrowDates.length : 3,
+          duration: `${selectedBorrowDates.length > 0 ? selectedBorrowDates.length : 3} Days`,
         }),
       });
 
@@ -1169,6 +1417,13 @@ function RepositoryOfRemnantsPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      if (!currentUser) {
+                        setAuthTriggerMsg("Sign in or join Mohalla to lend an item.");
+                        setAuthInitialMode("login");
+                        setPendingActionAfterAuth("lend");
+                        setShowAuthModal(true);
+                        return;
+                      }
                       setActiveNavTab("lend");
                     }}
                     className="btn-peek-sm px-3 py-1.5 sm:px-5 sm:py-2 tracking-wider sm:tracking-[0.2em] text-[11px] sm:text-[0.7rem] cursor-pointer"
@@ -1254,7 +1509,15 @@ function RepositoryOfRemnantsPage() {
             {/* TAB CONTENT: LEND FORM, RECOMMENDATIONS, MOHALLA STORIES OR EXPLORE ITEMS */}
             {activeNavTab === "lend" ? (
               <div className="animate-fadeIn">
-                <LendPage onBack={() => setActiveNavTab("explore")} />
+                <LendPage
+                  onBack={() => {
+                    if (backStack.has("tab_nav")) {
+                      backStack.pop("tab_nav", () => setActiveNavTab("explore"));
+                    } else {
+                      setActiveNavTab("explore");
+                    }
+                  }}
+                />
               </div>
             ) : activeNavTab === "recommendations" ? (
               <div className="animate-fadeIn">
@@ -1271,8 +1534,11 @@ function RepositoryOfRemnantsPage() {
                 <MohallaStoriesView
                   currentUser={currentUser}
                   onRequireAuth={(callback, msg) => {
-                    if (!currentUser?.token) {
-                      alert(msg || "Sign in to share your Mohalla Moment.");
+                    const user = currentUser?.token ? currentUser : getStoredUser();
+                    if (!user?.token) {
+                      setAuthTriggerMsg(msg || "Sign in to share your Mohalla Moment.");
+                      setAuthInitialMode("login");
+                      setShowAuthModal(true);
                       return false;
                     }
                     if (callback) callback();
@@ -1534,7 +1800,7 @@ function RepositoryOfRemnantsPage() {
                                     {conv.lastMessage ? `"${conv.lastMessage}"` : "No messages yet. Tap to start chatting!"}
                                   </span>
                                   <div className="btn-peek-sm w-full flex items-center justify-between mt-1">
-                                    <span>OPEN 2-WAY CHAT</span>
+                                    <span>Chatwa Kholo</span>
                                     <span>➔</span>
                                   </div>
                                 </div>
@@ -1559,7 +1825,13 @@ function RepositoryOfRemnantsPage() {
                           <div className="flex flex-wrap items-center gap-4">
                             <button
                               type="button"
-                              onClick={() => setActiveChatId(null)}
+                              onClick={() => {
+                                if (backStack.has("chat")) {
+                                  backStack.pop("chat", () => setActiveChatId(null));
+                                } else {
+                                  setActiveChatId(null);
+                                }
+                              }}
                               className="bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white font-mono text-xs px-4 py-2.5 rounded-full border border-neutral-700 transition-colors flex items-center gap-2 cursor-pointer shrink-0"
                             >
                               <span>←</span> Back to Conversations
@@ -1606,6 +1878,251 @@ function RepositoryOfRemnantsPage() {
                             </div>
                           )}
                         </div>
+
+                        {/* Transaction Lifecycle Banner Card */}
+                        {(() => {
+                          const activeRequest = borrowRequests.find(
+                            (r) => r.id === activeConv?.borrowRequestId || r.conversationId === activeConv?.id
+                          );
+                          if (!activeRequest) return null;
+
+                          const isBorrower = activeRequest.borrowerUsername?.toLowerCase() === currentUser?.username?.toLowerCase();
+                          const isLender = activeRequest.lenderUsername?.toLowerCase() === currentUser?.username?.toLowerCase();
+                          const reqStatus = activeRequest.status;
+
+                          if (reqStatus === "awaiting_handover") {
+                            return (
+                              <div className="bg-[#181a20] border border-amber-500/40 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fadeIn shadow-lg">
+                                <div className="flex items-start gap-3">
+                                  <span className="text-2xl">📦</span>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="text-sm font-bold text-white">
+                                        {isBorrower ? "Did you receive the item?" : "Item Handover Pending"}
+                                      </h4>
+                                      <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-mono px-2 py-0.5 rounded-full uppercase">
+                                        Awaiting Handover
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-neutral-300 font-sans mt-1">
+                                      {isBorrower
+                                        ? `Please confirm when @${activeRequest.lenderUsername} has physically handed over ${itemName} to you.`
+                                        : `Hand over ${itemName} to @${activeRequest.borrowerUsername}. They will confirm receipt to activate the borrowing period.`}
+                                    </p>
+                                  </div>
+                                </div>
+                                {isBorrower && (
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmHandover(activeRequest.id, true)}
+                                      disabled={isProcessingRequestId === activeRequest.id}
+                                      className="bg-[#facc15] hover:bg-yellow-300 text-black font-extrabold text-xs uppercase px-4 py-2.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                                    >
+                                      {isProcessingRequestId === activeRequest.id ? "Confirming..." : "✓ Yes, I got it"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmHandover(activeRequest.id, false)}
+                                      disabled={isProcessingRequestId === activeRequest.id}
+                                      className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-mono px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
+                                    >
+                                      Not yet
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          if (reqStatus === "active" || reqStatus === "extended") {
+                            const isPastDue = activeRequest.dueDate && new Date() > new Date(activeRequest.dueDate);
+                            return (
+                              <div className="flex flex-col gap-3">
+                                <div className="bg-[#181a20] border border-teal-500/30 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fadeIn shadow-lg">
+                                  <div className="flex items-start gap-3">
+                                    <span className="text-2xl">🤝</span>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="text-sm font-bold text-white">Active Borrowing</h4>
+                                        <span className="bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-mono px-2 py-0.5 rounded-full uppercase">
+                                          {reqStatus === "extended" ? "Extended" : "Active"}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-neutral-300 font-mono mt-1">
+                                        Duration: {activeRequest.duration || `${activeRequest.durationDays} Days`}
+                                        {activeRequest.dueDate && ` · Due: ${new Date(activeRequest.dueDate).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}`}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  {/* Action Buttons */}
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    {isBorrower && activeRequest.extensionStatus !== "pending" && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowExtensionPicker(!showExtensionPicker)}
+                                        className="bg-neutral-800 hover:bg-neutral-700 text-teal-300 border border-teal-500/30 text-xs font-mono px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+                                      >
+                                        <span>⌛</span> Request Extension
+                                      </button>
+                                    )}
+
+                                    {isLender && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-neutral-400 font-mono hidden sm:inline">Returned?</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleConfirmReturn(activeRequest.id, true)}
+                                          disabled={isProcessingRequestId === activeRequest.id}
+                                          className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs uppercase px-3.5 py-2 rounded-xl shadow-md transition-all cursor-pointer"
+                                        >
+                                          ✓ Yes, returned
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleConfirmReturn(activeRequest.id, false)}
+                                          disabled={isProcessingRequestId === activeRequest.id}
+                                          className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-mono px-2.5 py-2 rounded-xl transition-all cursor-pointer"
+                                        >
+                                          Not yet
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Pending Extension Prompt for Lender */}
+                                {activeRequest.extensionStatus === "pending" && isLender && (
+                                  <div className="bg-[#1f1d16] border border-amber-500/40 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xl">⌛</span>
+                                      <span className="text-xs text-amber-200 font-sans">
+                                        <strong>@{activeRequest.borrowerUsername}</strong> requested to extend borrowing by <strong>+{activeRequest.extensionRequestedDays || 3} days</strong>.
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDecideExtension(activeRequest.id, true)}
+                                        disabled={isProcessingRequestId === activeRequest.id}
+                                        className="bg-[#facc15] hover:bg-yellow-300 text-black font-extrabold text-xs uppercase px-3.5 py-2 rounded-xl shadow-md transition-all cursor-pointer"
+                                      >
+                                        Accept (+{activeRequest.extensionRequestedDays || 3}d)
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDecideExtension(activeRequest.id, false)}
+                                        disabled={isProcessingRequestId === activeRequest.id}
+                                        className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-mono px-3 py-2 rounded-xl transition-all cursor-pointer"
+                                      >
+                                        Decline
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Pending Extension Info for Borrower */}
+                                {activeRequest.extensionStatus === "pending" && isBorrower && (
+                                  <div className="bg-[#1f1d16] border border-amber-500/30 rounded-2xl p-3 flex items-center justify-between gap-2 text-xs text-amber-200 font-mono animate-fadeIn">
+                                    <span>⌛ Extension request for +{activeRequest.extensionRequestedDays || 3} days is pending lender approval.</span>
+                                  </div>
+                                )}
+
+                                {/* Borrower Extension Picker */}
+                                {showExtensionPicker && isBorrower && (
+                                  <div className="bg-[#1b1c20] border border-neutral-700 rounded-2xl p-4 flex flex-wrap items-center gap-3 animate-fadeIn">
+                                    <span className="text-xs text-neutral-300 font-mono">Extend by:</span>
+                                    {[1, 3, 5, 7].map((days) => (
+                                      <button
+                                        key={days}
+                                        type="button"
+                                        onClick={() => handleRequestExtension(activeRequest.id, days)}
+                                        disabled={isProcessingRequestId === activeRequest.id}
+                                        className="px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-[#0c5360] hover:text-white text-neutral-300 text-xs font-mono border border-neutral-700 transition-all cursor-pointer"
+                                      >
+                                        +{days} {days === 1 ? "Day" : "Days"}
+                                      </button>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowExtensionPicker(false)}
+                                      className="text-neutral-500 hover:text-white text-xs font-mono ml-auto cursor-pointer"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          if (reqStatus === "overdue") {
+                            return (
+                              <div className="bg-[#241215] border border-rose-500/40 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fadeIn shadow-lg">
+                                <div className="flex items-start gap-3">
+                                  <span className="text-2xl">⚠️</span>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="text-sm font-bold text-rose-200">
+                                        {isLender ? "Has the item been returned?" : "Return Overdue"}
+                                      </h4>
+                                      <span className="bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-mono px-2 py-0.5 rounded-full uppercase font-bold">
+                                        Overdue
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-neutral-300 font-sans mt-1">
+                                      {isLender
+                                        ? `The scheduled return date has passed. Confirm once @${activeRequest.borrowerUsername} has returned ${itemName}.`
+                                        : `The return period has expired. Please return ${itemName} to @${activeRequest.lenderUsername}.`}
+                                    </p>
+                                  </div>
+                                </div>
+                                {isLender && (
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmReturn(activeRequest.id, true)}
+                                      disabled={isProcessingRequestId === activeRequest.id}
+                                      className="bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs uppercase px-4 py-2.5 rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                                    >
+                                      {isProcessingRequestId === activeRequest.id ? "Processing..." : "✓ Yes, returned"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleConfirmReturn(activeRequest.id, false)}
+                                      disabled={isProcessingRequestId === activeRequest.id}
+                                      className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-mono px-3.5 py-2.5 rounded-xl transition-all cursor-pointer"
+                                    >
+                                      Not yet
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          if (reqStatus === "completed") {
+                            return (
+                              <div className="bg-[#121c17] border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 animate-fadeIn">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-2xl">✨</span>
+                                  <div>
+                                    <h4 className="text-sm font-bold text-emerald-300">Borrowing Completed</h4>
+                                    <p className="text-xs text-neutral-400 font-sans mt-0.5">
+                                      {itemName} was returned safely. Historical chat is preserved.
+                                    </p>
+                                  </div>
+                                </div>
+                                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-mono px-2.5 py-1 rounded-full uppercase">
+                                  Returned ✓
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          return null;
+                        })()}
 
                         {/* Message Stream Area */}
                         <div className="flex flex-col gap-4 min-h-[340px] max-h-[460px] overflow-y-auto pr-2 custom-scrollbar">
@@ -1800,7 +2317,7 @@ function RepositoryOfRemnantsPage() {
                       </div>
 
                       {(() => {
-                        const activeLends = (profileData?.listings && profileData.listings.length > 0)
+                        const activeLends = Array.isArray(profileData?.listings)
                           ? profileData.listings
                           : (profileData?.lent || []);
                         return (
@@ -1883,7 +2400,13 @@ function RepositoryOfRemnantsPage() {
                                         <button
                                           type="button"
                                           disabled={deletingItemId === item.id}
-                                          onClick={() => setItemToDelete(null)}
+                                          onClick={() => {
+                                            if (backStack.has("deleteItem")) {
+                                              backStack.pop("deleteItem", () => setItemToDelete(null));
+                                            } else {
+                                              setItemToDelete(null);
+                                            }
+                                          }}
                                           className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-mono text-[11px] px-2.5 py-1.5 rounded-xl transition-all cursor-pointer"
                                           title="Cancel"
                                         >
@@ -2043,7 +2566,7 @@ function RepositoryOfRemnantsPage() {
                           onClick={handleCloseBorrowPanel}
                           className="btn-peek-sm cursor-pointer"
                         >
-                          ← BACK TO STORE ITEMS
+                          ← Back
                         </button>
                       </div>
                       <div>
@@ -2070,10 +2593,6 @@ function RepositoryOfRemnantsPage() {
                       ✕
                     </button>
                   </div>
-
-                  <div className="hidden md:flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-full w-fit">
-                    <span>✓ 100% Free Neighborhood Sharing</span>
-                  </div>
                 </div>
 
                 {borrowRequestSent ? (
@@ -2090,8 +2609,12 @@ function RepositoryOfRemnantsPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setBorrowingItemKey(null);
-                          setBorrowRequestSent(false);
+                          if (backStack.has("borrow")) {
+                            backStack.pop("borrow");
+                          } else {
+                            setBorrowingItemKey(null);
+                            setBorrowRequestSent(false);
+                          }
                           setActiveNavTab("messages");
                         }}
                         className="btn-peek-sm"
@@ -2455,6 +2978,13 @@ function RepositoryOfRemnantsPage() {
                       <button
                         type="button"
                         onClick={() => {
+                          if (!currentUser) {
+                            setAuthTriggerMsg("Sign in or join Mohalla to lend an item.");
+                            setAuthInitialMode("login");
+                            setPendingActionAfterAuth("lend");
+                            setShowAuthModal(true);
+                            return;
+                          }
                           setActiveNavTab("lend");
                           setPanelOpen(true);
                         }}
@@ -2588,23 +3118,48 @@ function RepositoryOfRemnantsPage() {
           isOpen={showAuthModal}
           initialMode={authInitialMode}
           triggerMsg={authTriggerMsg}
-          onClose={() => setShowAuthModal(false)}
+          onClose={() => {
+            if (backStack.has("auth")) {
+              backStack.pop("auth", () => setShowAuthModal(false));
+            } else {
+              setShowAuthModal(false);
+            }
+          }}
           onSuccess={(user) => {
             setStoredUser(user);
             setCurrentUser(user);
-            setShowAuthModal(false);
+            if (pendingActionAfterAuth === "lend") {
+              setPendingActionAfterAuth(null);
+              setActiveNavTab("lend");
+              setPanelOpen(true);
+            }
+            if (backStack.has("auth")) {
+              backStack.pop("auth", () => setShowAuthModal(false));
+            } else {
+              setShowAuthModal(false);
+            }
           }}
         />
 
         {/* Edit Profile Modal */}
         <EditProfileModal
           isOpen={showEditProfileModal}
-          onClose={() => setShowEditProfileModal(false)}
+          onClose={() => {
+            if (backStack.has("editProfile")) {
+              backStack.pop("editProfile", () => setShowEditProfileModal(false));
+            } else {
+              setShowEditProfileModal(false);
+            }
+          }}
           currentProfile={profileData}
           currentUser={currentUser}
           onSaveSuccess={(updated) => {
             setProfileData((prev) => ({ ...prev, ...updated }));
-            setShowEditProfileModal(false);
+            if (backStack.has("editProfile")) {
+              backStack.pop("editProfile", () => setShowEditProfileModal(false));
+            } else {
+              setShowEditProfileModal(false);
+            }
           }}
         />
       </main>

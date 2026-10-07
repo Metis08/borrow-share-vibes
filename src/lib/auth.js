@@ -32,8 +32,8 @@ export function parseJwt(token) {
       typeof window !== "undefined" && typeof atob === "function"
         ? atob(padded)
         : typeof Buffer !== "undefined"
-        ? Buffer.from(padded, "base64").toString("binary")
-        : "";
+          ? Buffer.from(padded, "base64").toString("binary")
+          : "";
 
     if (!binaryStr) return null;
 
@@ -41,7 +41,7 @@ export function parseJwt(token) {
       binaryStr
         .split("")
         .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
+        .join(""),
     );
     return JSON.parse(json);
   } catch (e) {
@@ -50,8 +50,8 @@ export function parseJwt(token) {
         typeof window !== "undefined" && typeof atob === "function"
           ? atob(parts[1])
           : typeof Buffer !== "undefined"
-          ? Buffer.from(parts[1], "base64").toString("utf8")
-          : "";
+            ? Buffer.from(parts[1], "base64").toString("utf8")
+            : "";
       return JSON.parse(raw);
     } catch {
       return null;
@@ -76,8 +76,8 @@ let hadExpiredSessionOnStartup = false;
 
 /**
  * Get the currently stored user session from localStorage.
- * If the stored token is missing, expired, or invalid, it IMMEDIATELY
- * clears the storage and returns null.
+ * If the stored token is missing, expired, or invalid, it silently
+ * clears the storage and returns null without firing automatic modals on page load.
  */
 export function getStoredUser() {
   if (typeof window === "undefined") return null;
@@ -88,29 +88,38 @@ export function getStoredUser() {
 
     const user = JSON.parse(raw);
     if (!user || !user.token) {
-      clearSession("invalid_structure");
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE_KEY);
+      } catch {}
       return null;
     }
 
     if (!isTokenValid(user.token)) {
-      console.warn("[Auth] Stored JWT has expired. Evicting session immediately.");
-      hadExpiredSessionOnStartup = true;
-      clearSession("expired");
+      console.warn("[Auth] Stored JWT has expired. Silently clearing stored session.");
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE_KEY);
+      } catch {}
       return null;
     }
 
     return user;
   } catch (e) {
-    clearSession("corrupt_storage");
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {}
     return null;
   }
 }
 
 /**
  * Check if an expired session was detected and evicted on initial startup.
+ * Always returns false to prevent unprompted auth modal popups on initial page load.
  */
 export function didSessionExpireOnStartup() {
-  return hadExpiredSessionOnStartup;
+  return false;
 }
 
 export function resetSessionExpiredOnStartupFlag() {

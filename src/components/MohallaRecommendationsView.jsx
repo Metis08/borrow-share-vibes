@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import AuthModal from "@/components/AuthModal";
 import { getStoredUser, clearSession, isTokenValid, setStoredUser } from "@/lib/auth";
 import { apiUrl } from "@/lib/api";
+import { backStack } from "@/lib/backStack";
 
 const CATEGORIES = [
   { id: "All", label: "All", icon: "✨" },
@@ -49,6 +50,45 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authTriggerMsg, setAuthTriggerMsg] = useState("");
   const [authInitialMode, setAuthInitialMode] = useState("login");
+
+  // Back stack registration for Recommendation Detail Modal
+  useEffect(() => {
+    if (activePost) {
+      backStack.push("rec_detail", () => {
+        setActivePost(null);
+      });
+    } else {
+      if (backStack.has("rec_detail")) {
+        backStack.pop("rec_detail");
+      }
+    }
+  }, [activePost]);
+
+  // Back stack registration for Create Post Modal
+  useEffect(() => {
+    if (showCreateModal) {
+      backStack.push("rec_create", () => {
+        setShowCreateModal(false);
+      });
+    } else {
+      if (backStack.has("rec_create")) {
+        backStack.pop("rec_create");
+      }
+    }
+  }, [showCreateModal]);
+
+  // Back stack registration for Auth Modal
+  useEffect(() => {
+    if (showAuthModal) {
+      backStack.push("rec_auth", () => {
+        setShowAuthModal(false);
+      });
+    } else {
+      if (backStack.has("rec_auth")) {
+        backStack.pop("rec_auth");
+      }
+    }
+  }, [showAuthModal]);
 
   const requireAuth = (callback, msg) => {
     if (onRequireAuth) {
@@ -534,7 +574,13 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
               </div>
 
               <button
-                onClick={() => setActivePost(null)}
+                onClick={() => {
+                  if (backStack.has("rec_detail")) {
+                    backStack.pop("rec_detail", () => setActivePost(null));
+                  } else {
+                    setActivePost(null);
+                  }
+                }}
                 className="text-neutral-400 hover:text-white text-sm bg-neutral-800 hover:bg-neutral-700 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
               >
                 ✕
@@ -771,7 +817,13 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
               </div>
 
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  if (backStack.has("rec_create")) {
+                    backStack.pop("rec_create", () => setShowCreateModal(false));
+                  } else {
+                    setShowCreateModal(false);
+                  }
+                }}
                 className="text-neutral-400 hover:text-white text-sm bg-neutral-800 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
               >
                 ✕
@@ -862,7 +914,13 @@ export default function MohallaRecommendationsView({ currentUser, onRequireAuth,
       {/* Standalone Auth Modal Fallback */}
       <AuthModal
         isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
+        onClose={() => {
+          if (backStack.has("rec_auth")) {
+            backStack.pop("rec_auth", () => setShowAuthModal(false));
+          } else {
+            setShowAuthModal(false);
+          }
+        }}
         initialMode={authInitialMode}
         triggerMsg={authTriggerMsg}
         onSuccess={(session) => {
