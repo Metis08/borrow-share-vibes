@@ -268,8 +268,9 @@ export function MohallaRadarPage() {
             ${img ? `<img src="${img}" alt="${title}" style="max-width: 100%; max-height: 100%; object-fit: contain;" />` : `<span style="font-size: 32px;">📦</span>`}
           </div>
           <div style="font-size: 10px; font-family: monospace; color: #94a3b8; margin-bottom: 3px;">${category} • ${distanceStr}</div>
-          <div style="font-weight: 700; font-size: 13px; line-height: 1.3; margin-bottom: 4px; color: #ffffff;">${title}</div>
-          <div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Lender: <strong style="color: #ffffff;">${owner}</strong></div>
+          <div style="font-weight: 700; font-size: 13px; line-height: 1.3; margin-bottom: 4px; color: #ffffff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</div>
+          ${item.area ? `<div style="font-size: 11px; color: #5eead4; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.area}">📍 ${item.area}</div>` : ''}
+          <div style="font-size: 11px; color: #94a3b8; margin-bottom: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Lender: <strong style="color: #ffffff;">${owner}</strong></div>
           <a href="/peek?tab=explore" style="display: block; width: 100%; text-align: center; background: linear-gradient(to right, #09414b, #083842); color: #ffffff; font-weight: 700; font-size: 11px; padding: 9px 0; border-radius: 9999px; text-decoration: none; border: 1px solid #1e293b;">
             Request to Borrow ⚡
           </a>

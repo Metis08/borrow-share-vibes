@@ -93,8 +93,11 @@ export default function AuthModal({
       // Successful Create Shelf Flow
       const userSession = { username: u, token };
       setStoredUser(userSession);
-      if (onSuccess) onSuccess(userSession);
-      onClose();
+      if (onSuccess) {
+        onSuccess(userSession);
+      } else {
+        onClose();
+      }
     } catch (err) {
       console.error(err);
       setErrorMsg("Cannot connect to local Go backend server (port 8085).");
@@ -130,8 +133,11 @@ export default function AuthModal({
       const data = await res.json();
       const userSession = { username: data.username, token: data.token };
       setStoredUser(userSession);
-      if (onSuccess) onSuccess(userSession);
-      onClose();
+      if (onSuccess) {
+        onSuccess(userSession);
+      } else {
+        onClose();
+      }
     } catch (err) {
       console.error(err);
       setErrorMsg("Cannot connect to local Go backend server (port 8085).");

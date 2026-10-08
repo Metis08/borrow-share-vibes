@@ -103,6 +103,17 @@ class BackStackManager {
   }
 
   /**
+   * Silently removes a layer from the stack without executing window.history.back().
+   * Used when transitioning/navigating to a new page where history is naturally replaced.
+   */
+  dismiss(id) {
+    const index = this.stack.findIndex((item) => item.id === id);
+    if (index !== -1) {
+      this.stack.splice(index, 1);
+    }
+  }
+
+  /**
    * Checks whether a layer with the given ID is currently on the stack
    */
   has(id) {

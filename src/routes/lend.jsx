@@ -96,6 +96,73 @@ export function LendPage({ onBack }) {
   const [isDragging, setIsDragging] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  // Mohalla Radar Location State
+  const [locationCoords, setLocationCoords] = useState(() => {
+    const stored = getStoredUser();
+    if (stored?.latitude && stored?.longitude && stored.latitude !== 0 && stored.longitude !== 0) {
+      return { lat: stored.latitude, lng: stored.longitude };
+    }
+    return null;
+  });
+  const [locationStatus, setLocationStatus] = useState("idle"); // 'idle' | 'requesting' | 'granted' | 'denied'
+  const [locationMessage, setLocationMessage] = useState("");
+
+  const requestLocation = (force = false) => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocationStatus("denied");
+      setLocationMessage("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setLocationStatus("requesting");
+    setLocationMessage("Requesting GPS coordinates for Mohalla Radar...");
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setLocationCoords(coords);
+        setLocationStatus("granted");
+        setLocationMessage(`Live coordinates calibrated (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`);
+
+        // If user is logged in, sync to user profile too
+        const user = getStoredUser();
+        if (user?.token) {
+          fetch(apiUrl("/api/user/location"), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${user.token}`,
+            },
+            body: JSON.stringify({
+              locationSharingEnabled: true,
+              latitude: coords.lat,
+              longitude: coords.lng,
+            }),
+          }).catch((err) => console.warn("Failed to sync user location:", err));
+
+          const updated = { ...user, latitude: coords.lat, longitude: coords.lng, locationSharingEnabled: true };
+          setStoredUser(updated);
+          setCurrentUser(updated);
+        }
+      },
+      (err) => {
+        console.warn("Location permission error:", err);
+        setLocationStatus("denied");
+        if (err.code === 1) {
+          setLocationMessage("Location permission denied. Item will be pinned at your neighborhood area.");
+        } else {
+          setLocationMessage("Unable to fetch GPS. Mohalla default coordinates will be used.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  useEffect(() => {
+    // Automatically trigger browser location prompt on page load
+    requestLocation();
+  }, []);
+
   const compressImage = (file) =>
     new Promise((resolve, reject) => {
       const objectUrl = URL.createObjectURL(file);
@@ -203,6 +270,23 @@ export function LendPage({ onBack }) {
     setIsSubmitting(true);
 
     try {
+      let finalCoords = locationCoords;
+      if (!finalCoords && typeof window !== "undefined" && navigator.geolocation && locationStatus !== "denied") {
+        try {
+          finalCoords = await new Promise((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+              () => resolve(null),
+              { enableHighAccuracy: true, timeout: 3500 }
+            );
+          });
+          if (finalCoords) {
+            setLocationCoords(finalCoords);
+            setLocationStatus("granted");
+          }
+        } catch (_) {}
+      }
+
       const headers = {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${currentUser.token}`,
@@ -221,6 +305,8 @@ export function LendPage({ onBack }) {
           duration: formData.duration,
           condition: formData.condition,
           imageUrl: finalImageUrl || "",
+          latitude: finalCoords ? finalCoords.lat : 0,
+          longitude: finalCoords ? finalCoords.lng : 0,
         }),
       });
 
@@ -234,6 +320,22 @@ export function LendPage({ onBack }) {
           return;
         }
         throw new Error(errText || `Server returned error (${res.status})`);
+      }
+
+      // If we got coordinates, ensure user profile radar sharing is enabled
+      if (finalCoords && currentUser?.token) {
+        fetch(apiUrl("/api/user/location"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentUser.token}`,
+          },
+          body: JSON.stringify({
+            locationSharingEnabled: true,
+            latitude: finalCoords.lat,
+            longitude: finalCoords.lng,
+          }),
+        }).catch((err) => console.warn("Failed to update user location after lend submit:", err));
       }
 
       setSubmitted(true);
@@ -489,6 +591,60 @@ export function LendPage({ onBack }) {
                     placeholder="e.g. Block E · 150m away"
                     className="bg-neutral-950/90 border border-neutral-700/80 focus:border-[#0c5360] focus:outline-none rounded-2xl px-4 py-3 text-xs sm:text-sm text-white placeholder-neutral-500 font-sans transition-colors"
                   />
+                </div>
+              </div>
+
+              {/* Mohalla Radar Live Geolocation Pin Banner */}
+              <div className={`p-4 rounded-2xl border transition-all ${
+                locationStatus === "granted"
+                  ? "bg-emerald-950/25 border-emerald-500/40 text-emerald-200 shadow-[0_0_20px_rgba(16,185,129,0.1)]"
+                  : locationStatus === "requesting"
+                  ? "bg-amber-950/25 border-amber-500/40 text-amber-200 animate-pulse"
+                  : "bg-[#082029]/40 border-teal-800/50 text-teal-200"
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-lg shrink-0">
+                      {locationStatus === "granted" ? "📍" : locationStatus === "requesting" ? "📡" : "🗺️"}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-white">Mohalla Radar Geolocation</span>
+                        {locationStatus === "granted" ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium">
+                            Live GPS Pin Active
+                          </span>
+                        ) : locationStatus === "requesting" ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 font-medium">
+                            Detecting Location...
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-neutral-800 text-neutral-400 border border-neutral-700 font-medium">
+                            Permission Needed
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-neutral-400 mt-1 font-sans leading-tight">
+                        {locationStatus === "granted" && locationCoords
+                          ? `Live coordinates calibrated (${locationCoords.lat.toFixed(4)}, ${locationCoords.lng.toFixed(4)}). Neighbors will find this item on the Radar map.`
+                          : locationStatus === "requesting"
+                          ? "Detecting your coordinates so neighbours can discover this item on Mohalla Radar..."
+                          : "Allow location access so nearby neighbors can locate this item on the live Mohalla Radar map."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => requestLocation(true)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-mono font-medium shrink-0 transition-all cursor-pointer ${
+                      locationStatus === "granted"
+                        ? "bg-emerald-900/40 hover:bg-emerald-800/50 text-emerald-300 border border-emerald-600/40"
+                        : "bg-[#0c5360] hover:bg-[#0e6374] text-white border border-teal-400/40 shadow-lg hover:scale-105 active:scale-95"
+                    }`}
+                  >
+                    {locationStatus === "granted" ? "Re-detect GPS" : "📍 Allow Location"}
+                  </button>
                 </div>
               </div>
 

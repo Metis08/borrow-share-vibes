@@ -813,13 +813,18 @@ export default function MohallaRadar({
 
           <div className="mt-4 border-t border-white/5 pt-3">
             <div className="flex items-center justify-between mb-3">
-              <div>
-                <span className="text-[10px] sm:text-xs text-panel-note uppercase tracking-wider block">Owner</span>
-                <span className="font-mono text-xs sm:text-sm text-white">
+              <div className="min-w-0 flex-1 mr-2">
+                <span className="text-[10px] sm:text-xs text-panel-note uppercase tracking-wider block">Owner & Area</span>
+                <span className="font-mono text-xs sm:text-sm text-white block truncate" title={selectedRadarItem.shelfName || `${selectedRadarItem.owner}'s Shelf`}>
                   🚪 {selectedRadarItem.shelfName || `${selectedRadarItem.owner}'s Shelf`}
                 </span>
+                {selectedRadarItem.area && (
+                  <span className="font-sans text-[11px] text-teal-300 block mt-0.5 truncate" title={selectedRadarItem.area}>
+                    📍 {selectedRadarItem.area}
+                  </span>
+                )}
               </div>
-              <span className="bg-green-500/10 text-green-400 border border-green-500/25 rounded px-2 py-0.5 font-mono text-[10px] sm:text-xs uppercase tracking-widest font-bold">
+              <span className="bg-green-500/10 text-green-400 border border-green-500/25 rounded px-2 py-0.5 font-mono text-[10px] sm:text-xs uppercase tracking-widest font-bold shrink-0">
                 Available
               </span>
             </div>

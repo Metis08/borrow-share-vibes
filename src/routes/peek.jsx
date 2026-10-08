@@ -49,6 +49,34 @@ function formatLendDuration(dur) {
   return `For ${clean}`;
 }
 
+function formatDisplayArea(areaStr) {
+  if (!areaStr || typeof areaStr !== "string") return "Nearby";
+  const trimmed = areaStr.trim();
+  if (!trimmed) return "Nearby";
+  if (trimmed.length <= 18) return trimmed;
+  const lower = trimmed.toLowerCase();
+  if (lower.includes("palam colony") || lower.includes("sadhnagar") || lower.includes("sadh nagar") || lower.includes("palam")) {
+    return "Palam Colony";
+  }
+  if (lower.includes("dwarka")) return "Dwarka";
+  if (lower.includes("janakpuri")) return "Janakpuri";
+  if (lower.includes("lajpat")) return "Lajpat Nagar";
+  if (lower.includes("kalkaji")) return "Kalkaji";
+  if (lower.includes("cr park") || lower.includes("c.r. park")) return "CR Park";
+  if (lower.includes("saket")) return "Saket";
+  if (lower.includes("hauz khas")) return "Hauz Khas";
+  if (lower.includes("rohini")) return "Rohini";
+  if (lower.includes("noida")) return "Noida";
+  if (lower.includes("gurgaon") || lower.includes("gurugram")) return "Gurugram";
+
+  const parts = trimmed.split(/[,·]/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length > 1) {
+    const last = parts[parts.length - 1];
+    return last.length <= 18 ? last : last.slice(0, 16) + "…";
+  }
+  return trimmed.slice(0, 18) + "…";
+}
+
 export const Route = createFileRoute("/peek")({
   validateSearch: (search) => ({
     tab: search?.tab || "",
@@ -96,6 +124,12 @@ function RepositoryOfRemnantsPage() {
 
   const [activeItem, setActiveItem] = useState(null);
   const [panelOpen, setPanelOpen] = useState(() => {
+    const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
+    if (isPhone) {
+      // On phone view, initial landing is always the Welcome to the Mohalla Store page,
+      // not directly the glass panel of items.
+      return false;
+    }
     if (search?.panel === "open") return true;
     if (search?.tab && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(search.tab)) {
       return true;
@@ -143,6 +177,7 @@ function RepositoryOfRemnantsPage() {
 
   const handleOpenPanel = (tab = null) => {
     if (tab) setActiveNavTab(tab);
+    fetchDbItems();
     backStack.push("panel", () => {
       handleClosePanelInternal();
     });
@@ -195,9 +230,35 @@ function RepositoryOfRemnantsPage() {
     return "explore";
   });
 
+  // On mount, always reset scroll position and ensure phone view shows the Welcome screen
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo(0, 0);
+      const isPhone = window.innerWidth < 768;
+      if (isPhone) {
+        setPanelOpen(false);
+        if (panelRef.current) {
+          panelRef.current.style.transform = "";
+          panelRef.current.style.transition = "";
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
     const t = search?.tab || (location?.search && location.search.tab);
     const isPanelOpenParam = search?.panel === "open" || (location?.search && location.search.panel === "open");
+
+    if (isPhone) {
+      // On phone view, do not auto-force open the glass panel on initial landing
+      if (t && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(t)) {
+        setActiveNavTab(t);
+      }
+      setPanelOpen(false);
+      return;
+    }
+
     if (t && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(t)) {
       setActiveNavTab(t);
       setPanelOpen(true);
@@ -208,8 +269,10 @@ function RepositoryOfRemnantsPage() {
 
   const [showFlyer, setShowFlyer] = useState(false);
   const [dbItems, setDbItems] = useState({});
+  const [isLoadingDbItems, setIsLoadingDbItems] = useState(true);
 
-  const fetchDbItems = async () => {
+  const fetchDbItems = async (retryCount = 0) => {
+    setIsLoadingDbItems(true);
     try {
       const res = await fetch(apiUrl("/api/items"));
       if (res.ok) {
@@ -230,7 +293,7 @@ function RepositoryOfRemnantsPage() {
               code: item.id,
               owner: owner,
               rawUsername: item.username || owner,
-              distance: area,
+              distance: formatDisplayArea(area),
               area: area,
               category: category,
               status: item.status ? (item.status === "active" ? "Available Now" : item.status) : "Available Now",
@@ -242,16 +305,36 @@ function RepositoryOfRemnantsPage() {
             };
           });
           setDbItems(mapped);
+          setIsLoadingDbItems(false);
+          return;
         }
+      }
+      if (retryCount < 2) {
+        setTimeout(() => fetchDbItems(retryCount + 1), 600);
+        return;
       }
     } catch (err) {
       console.error("Failed to fetch DB items:", err);
+      if (retryCount < 2) {
+        setTimeout(() => fetchDbItems(retryCount + 1), 600);
+        return;
+      }
+    } finally {
+      if (retryCount >= 2) {
+        setIsLoadingDbItems(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchDbItems();
   }, [activeNavTab]);
+
+  useEffect(() => {
+    if (panelOpen) {
+      fetchDbItems();
+    }
+  }, [panelOpen]);
 
   useEffect(() => {
     const keys = Object.keys(dbItems);
@@ -926,6 +1009,13 @@ function RepositoryOfRemnantsPage() {
       const scrollY = window.scrollY;
       const vh = window.innerHeight || 800;
       const progress = Math.min(1, Math.max(0, scrollY / vh));
+      const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
+
+      if (isPhone && scrollY < 50) {
+        panelRef.current.style.transform = "";
+        panelRef.current.style.transition = "none";
+        return;
+      }
 
       if (progress >= 0.98) {
         // Reached the extreme top -> STICK!
@@ -1039,8 +1129,16 @@ function RepositoryOfRemnantsPage() {
           {/* Left Brand Title in Hindi */}
           <Link
             to="/peek"
-            search={{ tab: "explore" }}
-            onClick={() => setActiveNavTab("explore")}
+            search={{}}
+            onClick={(e) => {
+              const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
+              if (isPhone) {
+                e.preventDefault();
+                setPanelOpen(false);
+              } else {
+                setActiveNavTab("explore");
+              }
+            }}
             className="flex items-center gap-3 group cursor-pointer"
           >
             <img
@@ -1457,7 +1555,12 @@ function RepositoryOfRemnantsPage() {
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveNavTab(tab.id)}
+                    onClick={() => {
+                      setActiveNavTab(tab.id);
+                      if (tab.id === "explore") {
+                        fetchDbItems();
+                      }
+                    }}
                     className={`text-[11px] font-mono px-3 py-1.5 rounded-full transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                       activeNavTab === tab.id
                         ? "bg-[#09414b] text-teal-100 font-bold border border-[#0c5360] shadow-md"
@@ -2962,7 +3065,28 @@ function RepositoryOfRemnantsPage() {
 
                 {/* Grid of Neighborhood Remnants Cards (Screen Wide 4-column layout) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pt-2">
-                  {filteredItems.length === 0 ? (
+                  {isLoadingDbItems && Object.keys(itemDetails).length === 0 ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <div
+                        key={`skeleton_${i}`}
+                        className="bg-neutral-900/40 border border-neutral-800/80 rounded-2xl p-5 flex flex-col justify-between animate-pulse min-h-[260px]"
+                      >
+                        <div className="flex justify-end mb-3">
+                          <div className="h-4 w-20 bg-neutral-800 rounded-full" />
+                        </div>
+                        <div className="w-full h-36 bg-neutral-800/50 rounded-xl my-2 flex items-center justify-center">
+                          <span className="text-2xl opacity-20">📦</span>
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          <div className="h-4 w-3/4 bg-neutral-800 rounded" />
+                          <div className="flex justify-between items-center pt-1">
+                            <div className="h-3 w-1/3 bg-neutral-800/60 rounded" />
+                            <div className="h-3 w-1/4 bg-neutral-800/60 rounded" />
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : filteredItems.length === 0 ? (
                     <div className="col-span-full py-16 text-center flex flex-col items-center justify-center gap-4 bg-neutral-900/40 rounded-3xl border border-neutral-800">
                       <div className="w-16 h-16 rounded-full bg-neutral-800/80 flex items-center justify-center text-3xl">
                         📦
@@ -2998,7 +3122,7 @@ function RepositoryOfRemnantsPage() {
                       <div
                         key={key}
                         onClick={() => setBorrowingItemKey(key)}
-                        className={`group relative bg-neutral-900/50 hover:bg-neutral-800/60 border rounded-2xl p-5 flex flex-col justify-between transition-colors duration-200 cursor-pointer ${
+                        className={`group relative bg-neutral-900/50 hover:bg-neutral-800/60 border rounded-2xl p-5 flex flex-col justify-between transition-colors duration-200 cursor-pointer overflow-hidden min-w-0 ${
                           activeItem === key
                             ? "border-[#0c5360] bg-[#09414b]/20"
                             : "border-neutral-800 hover:border-neutral-700"
@@ -3012,7 +3136,7 @@ function RepositoryOfRemnantsPage() {
                         </div>
 
                         {/* Item Thumbnail */}
-                        <div className="w-full h-36 flex items-center justify-center my-2 p-2">
+                        <div className="w-full h-36 flex items-center justify-center my-2 p-2 overflow-hidden">
                           <ItemPhoto
                             src={item.image}
                             alt={item.title}
@@ -3021,18 +3145,23 @@ function RepositoryOfRemnantsPage() {
                         </div>
 
                         {/* Info */}
-                        <div className="mt-3">
-                          <h4 className="text-sm font-semibold text-white group-hover:text-teal-200 transition-colors line-clamp-1">
+                        <div className="mt-3 min-w-0 w-full">
+                          <h4 className="text-sm font-semibold text-white group-hover:text-teal-200 transition-colors truncate block">
                             {item.title}
                           </h4>
-                          <div className="flex items-end justify-between text-xs text-neutral-400 mt-2 gap-2">
-                            <span className="truncate max-w-[48%]">{item.owner}</span>
-                            <div className="text-right flex flex-col items-end shrink-0">
-                              <span className="font-mono text-teal-300 text-[10px] font-medium leading-tight">
+                          <div className="flex items-end justify-between text-xs text-neutral-400 mt-2 gap-2 min-w-0 w-full">
+                            <span className="truncate max-w-[45%] shrink min-w-0 font-sans" title={item.owner}>
+                              {item.owner}
+                            </span>
+                            <div className="text-right flex flex-col items-end shrink min-w-0 max-w-[55%] overflow-hidden">
+                              <span className="font-mono text-teal-300 text-[10px] font-medium leading-tight whitespace-nowrap">
                                 {formatLendDuration(item.duration)}
                               </span>
-                              <span className="font-mono text-neutral-500 text-[11px] leading-tight mt-0.5">
-                                {item.distance || item.area || "Nearby"}
+                              <span
+                                className="font-mono text-neutral-500 text-[11px] leading-tight mt-0.5 truncate max-w-full block"
+                                title={item.area || item.distance || "Nearby"}
+                              >
+                                {formatDisplayArea(item.distance || item.area)}
                               </span>
                             </div>
                           </div>
@@ -3128,10 +3257,19 @@ function RepositoryOfRemnantsPage() {
           onSuccess={(user) => {
             setStoredUser(user);
             setCurrentUser(user);
+            const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
             if (pendingActionAfterAuth === "lend") {
               setPendingActionAfterAuth(null);
               setActiveNavTab("lend");
               setPanelOpen(true);
+            } else if (isPhone) {
+              // On phone view, keep user on Welcome page
+              setPanelOpen(false);
+              window.scrollTo(0, 0);
+              if (panelRef.current) {
+                panelRef.current.style.transform = "";
+                panelRef.current.style.transition = "";
+              }
             }
             if (backStack.has("auth")) {
               backStack.pop("auth", () => setShowAuthModal(false));

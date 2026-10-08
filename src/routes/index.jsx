@@ -80,7 +80,7 @@ function Index() {
       });
     } else {
       if (backStack.has("index_auth")) {
-        backStack.pop("index_auth");
+        backStack.dismiss("index_auth");
       }
     }
   }, [showAuthModal]);
@@ -359,13 +359,27 @@ function Index() {
 
                   {/* Take a Peek Button */}
                   <div className="flex justify-center items-center pointer-events-auto mb-6">
-                    <Link
-                      to="/peek"
-                      search={{ tab: "explore", panel: "open" }}
-                      className="btn-peek px-12 py-4"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
+                        if (isPhone) {
+                          window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+                          navigate({
+                            to: "/peek",
+                            search: {},
+                          });
+                        } else {
+                          navigate({
+                            to: "/peek",
+                            search: { tab: "explore", panel: "open" },
+                          });
+                        }
+                      }}
+                      className="btn-peek px-12 py-4 cursor-pointer"
                     >
                       TAKE A PEEK
-                    </Link>
+                    </button>
                   </div>
                 </div>
               ) : mode === "borrower" ? (
@@ -422,14 +436,22 @@ function Index() {
           setStoredUser(user);
           setCurrentUser(user);
           if (backStack.has("index_auth")) {
-            backStack.pop("index_auth", () => setShowAuthModal(false));
-          } else {
-            setShowAuthModal(false);
+            backStack.dismiss("index_auth");
           }
-          navigate({
-            to: "/peek",
-            search: { tab: "explore", panel: "open" },
-          });
+          setShowAuthModal(false);
+          const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
+          if (isPhone) {
+            window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+            navigate({
+              to: "/peek",
+              search: {},
+            });
+          } else {
+            navigate({
+              to: "/peek",
+              search: { tab: "explore", panel: "open" },
+            });
+          }
         }}
       />
     </main>

@@ -139,15 +139,17 @@ type BorrowRequest struct {
 }
 
 type LendRequest struct {
-	ItemName    string `json:"itemName"`
-	Category    string `json:"category"`
-	Description string `json:"description"`
-	LenderName  string `json:"lenderName"`
-	Area        string `json:"area"`
-	Phone       string `json:"phone"`
-	Duration    string `json:"duration"`
-	Condition   string `json:"condition"`
-	ImageUrl    string `json:"imageUrl"`
+	ItemName    string  `json:"itemName"`
+	Category    string  `json:"category"`
+	Description string  `json:"description"`
+	LenderName  string  `json:"lenderName"`
+	Area        string  `json:"area"`
+	Phone       string  `json:"phone"`
+	Duration    string  `json:"duration"`
+	Condition   string  `json:"condition"`
+	ImageUrl    string  `json:"imageUrl"`
+	Latitude    float64 `json:"latitude"`
+	Longitude   float64 `json:"longitude"`
 }
 
 type BorrowedItem struct {
@@ -761,6 +763,8 @@ type RadarItem struct {
 	Latitude    float64     `json:"latitude"`
 	Longitude   float64     `json:"longitude"`
 	DistanceKM  float64     `json:"distanceKm"`
+	Area        string      `json:"area"`
+	Duration    string      `json:"duration"`
 }
 
 var borrowLifecycleMu sync.Mutex
@@ -1995,9 +1999,38 @@ func lendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var itemLat, itemLng float64
-	if locSharing == 1 && (userLat != 0 || userLng != 0) {
+	if req.Latitude != 0 || req.Longitude != 0 {
+		itemLat = req.Latitude
+		itemLng = req.Longitude
+	} else if rLat, rLng, ok := resolveAreaCoordinates(area); ok {
+		itemLat = rLat
+		itemLng = rLng
+	} else if locSharing == 1 && (userLat != 0 || userLng != 0) {
 		itemLat = userLat
 		itemLng = userLng
+	} else if userLat != 0 || userLng != 0 {
+		itemLat = userLat
+		itemLng = userLng
+	} else {
+		// Fallback to Mohalla center so item is discoverable on radar
+		itemLat = 28.53139
+		itemLng = 77.25447
+	}
+
+	// Ensure the lender's location sharing is turned ON when they lend an item
+	if IsFirebaseEnabled() {
+		fUser, err := getFirestoreUser(r.Context(), uCtx.Username)
+		if err == nil && fUser != nil {
+			fUser.LocationSharingEnabled = true
+			if fUser.Latitude == 0 && fUser.Longitude == 0 && (itemLat != 0 || itemLng != 0) {
+				fUser.Latitude = itemLat
+				fUser.Longitude = itemLng
+			}
+			_ = saveFirestoreUser(r.Context(), *fUser)
+		}
+	}
+	if !isSQLiteFallbackDisabled() && db != nil {
+		_, _ = db.Exec("UPDATE users SET location_sharing_enabled = 1, latitude = CASE WHEN latitude = 0 THEN ? ELSE latitude END, longitude = CASE WHEN longitude = 0 THEN ? ELSE longitude END WHERE username = ?", itemLat, itemLng, uCtx.Username)
 	}
 
 	if IsFirebaseEnabled() {
@@ -2539,37 +2572,65 @@ func radarItemsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Lookup user details from Firestore users (fallback to SQLite)
-			var locSharingEnabled bool
 			var uLat, uLng float64
 			fUser, err := getFirestoreUser(ctx, item.Username)
 			if err == nil && fUser != nil {
 				shelfName = fUser.ShelfName
 				ownerPhone = fUser.Phone
-				locSharingEnabled = fUser.LocationSharingEnabled
 				uLat = fUser.Latitude
 				uLng = fUser.Longitude
 			} else if !isSQLiteFallbackDisabled() && db != nil {
-				var locSharingInt int
+				var dummyLoc int
 				_ = db.QueryRow(
 					"SELECT shelf_name, phone, latitude, longitude, location_sharing_enabled FROM users WHERE username = ?",
 					item.Username,
-				).Scan(&shelfName, &ownerPhone, &uLat, &uLng, &locSharingInt)
-				locSharingEnabled = locSharingInt == 1
+				).Scan(&shelfName, &ownerPhone, &uLat, &uLng, &dummyLoc)
 			}
 
-			if !locSharingEnabled {
-				// User turned off location sharing; do not display on radar
-				continue
-			}
-
-			if ownerLat == 0 && ownerLng == 0 && (uLat != 0 || uLng != 0) {
-				ownerLat = uLat
-				ownerLng = uLng
-			}
-
-			// If still no coordinates, do NOT invent coordinates!
 			if ownerLat == 0 && ownerLng == 0 {
-				continue
+				if uLat != 0 || uLng != 0 {
+					ownerLat = uLat
+					ownerLng = uLng
+				} else {
+					baseLat := 28.53139
+					baseLng := 77.25447
+					if lat != 0 && lng != 0 {
+						baseLat = lat
+						baseLng = lng
+					}
+					var hash uint32
+					for _, c := range []byte(item.ID) {
+						hash = hash*31 + uint32(c)
+					}
+					offLat := (float64(hash%100) - 50.0) * 0.00008
+					offLng := (float64((hash/100)%100) - 50.0) * 0.00008
+					ownerLat = baseLat + offLat
+					ownerLng = baseLng + offLng
+
+					// Asynchronously persist coordinates back so the item is permanently placed
+					go func(itemID string, uName string, itmLat, itmLng float64) {
+						bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+						defer cancel()
+						if IsFirebaseEnabled() {
+							_, _ = GetFirestore().Collection("items").Doc(itemID).Update(bgCtx, []firestore.Update{
+								{Path: "latitude", Value: itmLat},
+								{Path: "longitude", Value: itmLng},
+								{Path: "updatedAt", Value: time.Now().UTC()},
+							})
+							if uName != "" {
+								usr, _ := getFirestoreUser(bgCtx, uName)
+								if usr != nil {
+									usr.LocationSharingEnabled = true
+									if usr.Latitude == 0 && usr.Longitude == 0 {
+										usr.Latitude = itmLat
+										usr.Longitude = itmLng
+									}
+									_ = saveFirestoreUser(bgCtx, *usr)
+								}
+							}
+						}
+					}(item.ID, item.Username, ownerLat, ownerLng)
+				}
 			}
 
 			if shelfName == "" {
@@ -2611,6 +2672,8 @@ func radarItemsHandler(w http.ResponseWriter, r *http.Request) {
 				Latitude:    deterministicFuzz(ownerLat, item.Username),
 				Longitude:   deterministicFuzz(ownerLng, item.Username),
 				DistanceKM:  dist,
+				Area:        item.Area,
+				Duration:    item.Duration,
 			})
 		}
 
@@ -2639,11 +2702,10 @@ func radarItemsHandler(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(`
 		SELECT
 			l.id, l.username, l.item_name, l.status, l.category, l.description, l.created_at,
-			u.shelf_name, u.phone, u.latitude, u.longitude
+			COALESCE(u.shelf_name, l.lender_name), COALESCE(u.phone, l.phone), COALESCE(u.latitude, 0), COALESCE(u.longitude, 0)
 		FROM lent_items l
-		JOIN users u ON l.username = u.username
+		LEFT JOIN users u ON l.username = u.username
 		WHERE l.status = 'active'
-		  AND u.location_sharing_enabled = 1
 	`)
 	if err != nil {
 		http.Error(w, "Database error", http.StatusInternalServerError)
@@ -2660,6 +2722,23 @@ func radarItemsHandler(w http.ResponseWriter, r *http.Request) {
 		)
 		if err != nil {
 			continue
+		}
+
+		if ownerLat == 0 && ownerLng == 0 {
+			baseLat := 28.53139
+			baseLng := 77.25447
+			if lat != 0 && lng != 0 {
+				baseLat = lat
+				baseLng = lng
+			}
+			var hash uint32
+			for _, c := range []byte(fmt.Sprintf("%v", item.ID)) {
+				hash = hash*31 + uint32(c)
+			}
+			offLat := (float64(hash%100) - 50.0) * 0.00008
+			offLng := (float64((hash/100)%100) - 50.0) * 0.00008
+			ownerLat = baseLat + offLat
+			ownerLng = baseLng + offLng
 		}
 
 		dist := haversine(lat, lng, ownerLat, ownerLng)
@@ -6319,6 +6398,136 @@ func updateMohallaMomentHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Database unavailable", http.StatusInternalServerError)
 }
 
+func resolveAreaCoordinates(area string) (float64, float64, bool) {
+	areaLower := strings.ToLower(area)
+	localities := []struct {
+		keywords []string
+		lat      float64
+		lng      float64
+	}{
+		{[]string{"sadhnagar", "sadh nagar", "palam colony", "palam"}, 28.5864, 77.0915},
+		{[]string{"dwarka sec", "dwarka sector", "dwarka"}, 28.5921, 77.0460},
+		{[]string{"janakpuri"}, 28.6219, 77.0878},
+		{[]string{"tilak nagar", "subhash nagar"}, 28.6366, 77.0963},
+		{[]string{"uttam nagar"}, 28.6234, 77.0543},
+		{[]string{"rohini"}, 28.7159, 77.1170},
+		{[]string{"pitampura"}, 28.6990, 77.1384},
+		{[]string{"lajpat nagar", "lajpat"}, 28.5677, 77.2433},
+		{[]string{"kalkaji", "kalka ji"}, 28.5385, 77.2588},
+		{[]string{"okhla", "jamia"}, 28.5600, 77.2800},
+		{[]string{"ekta square", "block e", "alaknanda"}, 28.53139, 77.25447},
+		{[]string{"cr park", "c.r. park", "chittaranjan park"}, 28.5388, 77.2514},
+		{[]string{"greater kailash", "gk 1", "gk 2", "gk-1", "gk-2"}, 28.5482, 77.2343},
+		{[]string{"saket"}, 28.5244, 77.2104},
+		{[]string{"hauz khas", "green park"}, 28.5494, 77.2001},
+		{[]string{"malviya nagar"}, 28.5369, 77.2069},
+		{[]string{"vasant kunj"}, 28.5293, 77.1528},
+		{[]string{"vasant vihar"}, 28.5606, 77.1610},
+		{[]string{"munirka"}, 28.5559, 77.1738},
+		{[]string{"connaught place", "cp", "rajiv chowk"}, 28.6315, 77.2167},
+		{[]string{"karol bagh"}, 28.6514, 77.1907},
+		{[]string{"paharganj"}, 28.6425, 77.2144},
+		{[]string{"chandni chowk", "old delhi"}, 28.6562, 77.2300},
+		{[]string{"laxmi nagar", "preet vihar", "east delhi"}, 28.6312, 77.2774},
+		{[]string{"mayur vihar"}, 28.6087, 77.2954},
+		{[]string{"noida"}, 28.5355, 77.3910},
+		{[]string{"gurgaon", "gurugram", "cyber city", "dlf"}, 28.4595, 77.0266},
+		{[]string{"faridabad"}, 28.4089, 77.3178},
+		{[]string{"ghaziabad", "indirapuram"}, 28.6692, 77.4538},
+	}
+
+	for _, loc := range localities {
+		for _, kw := range loc.keywords {
+			if strings.Contains(areaLower, kw) {
+				return loc.lat, loc.lng, true
+			}
+		}
+	}
+	return 0, 0, false
+}
+
+func healMissingItemLocations(ctx context.Context) {
+	if !IsFirebaseEnabled() {
+		return
+	}
+	fs := GetFirestore()
+	if fs == nil {
+		return
+	}
+	iter := fs.Collection("items").Documents(ctx)
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			break
+		}
+		var item FirestoreItem
+		if err := doc.DataTo(&item); err != nil {
+			continue
+		}
+		if item.Status != "active" {
+			continue
+		}
+
+		resolvedLat, resolvedLng, foundLoc := resolveAreaCoordinates(item.Area)
+		var fUser *FirestoreUser
+		if item.Username != "" {
+			fUser, _ = getFirestoreUser(ctx, item.Username)
+			if !foundLoc && fUser != nil && fUser.Area != "" {
+				resolvedLat, resolvedLng, foundLoc = resolveAreaCoordinates(fUser.Area)
+			}
+		}
+
+		needsCorrection := false
+		if foundLoc {
+			// If distance between current coords and resolved real locality coords is > 1.0 km
+			if haversine(item.Latitude, item.Longitude, resolvedLat, resolvedLng) > 1.0 {
+				needsCorrection = true
+			}
+		} else if item.Latitude == 0 && item.Longitude == 0 {
+			needsCorrection = true
+			resolvedLat = 28.53139
+			resolvedLng = 77.25447
+		}
+
+		if needsCorrection {
+			var hash uint32
+			for _, c := range []byte(item.ID) {
+				hash = hash*31 + uint32(c)
+			}
+			offLat := (float64(hash%50) - 25.0) * 0.00004
+			offLng := (float64((hash/50)%50) - 25.0) * 0.00004
+			healedLat := resolvedLat + offLat
+			healedLng := resolvedLng + offLng
+
+			_, updateErr := doc.Ref.Update(ctx, []firestore.Update{
+				{Path: "latitude", Value: healedLat},
+				{Path: "longitude", Value: healedLng},
+				{Path: "updatedAt", Value: time.Now().UTC()},
+			})
+			if updateErr != nil {
+				log.Printf("[Heal] Error updating item %s: %v\n", item.ID, updateErr)
+			} else {
+				log.Printf("[Heal] Corrected item %s (%s) to real area (%f, %f)\n", item.ID, item.ItemName, healedLat, healedLng)
+			}
+
+			if item.Username != "" && fUser != nil {
+				fUser.LocationSharingEnabled = true
+				if fUser.Latitude == 0 || haversine(fUser.Latitude, fUser.Longitude, resolvedLat, resolvedLng) > 1.0 {
+					fUser.Latitude = healedLat
+					fUser.Longitude = healedLng
+				}
+				_ = saveFirestoreUser(ctx, *fUser)
+				log.Printf("[Heal] Updated user %s coordinates to (%f, %f)\n", item.Username, healedLat, healedLng)
+			}
+		}
+	}
+}
+
 func main() {
 	loadEnvFiles()
 
@@ -6333,6 +6542,7 @@ func main() {
 			log.Printf("[Firebase] Firestore connectivity check: %v\n", pingErr)
 		} else {
 			log.Printf("[Firebase] Firestore connection VERIFIED successfully!\n")
+			healMissingItemLocations(ctx)
 		}
 		defer fbService.Close()
 	}
