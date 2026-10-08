@@ -124,29 +124,15 @@ function RepositoryOfRemnantsPage() {
 
   const [activeItem, setActiveItem] = useState(null);
   const [panelOpen, setPanelOpen] = useState(() => {
-    const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
-    if (isPhone) {
-      // On phone view, initial landing is always the Welcome to the Mohalla Store page,
-      // not directly the glass panel of items.
-      return false;
-    }
+    // Initial landing on /peek should always show the Welcome to the Mohalla Store page
+    // across all devices (phone, iPad, desktop), unless explicitly opened with panel=open.
     if (search?.panel === "open") return true;
-    if (search?.tab && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(search.tab)) {
-      return true;
-    }
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("panel") === "open") return true;
-      const t = params.get("tab");
-      if (t && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(t)) {
-        return true;
-      }
     }
-    if (location?.search) {
-      if (location.search.panel === "open") return true;
-      if (location.search.tab && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(location.search.tab)) {
-        return true;
-      }
+    if (location?.search && location.search.panel === "open") {
+      return true;
     }
     return false;
   });
@@ -230,12 +216,12 @@ function RepositoryOfRemnantsPage() {
     return "explore";
   });
 
-  // On mount, always reset scroll position and ensure phone view shows the Welcome screen
+  // On mount, always reset scroll position and ensure Welcome screen is shown across all devices
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.scrollTo(0, 0);
-      const isPhone = window.innerWidth < 768;
-      if (isPhone) {
+      const isPanelOpenParam = search?.panel === "open" || (location?.search && location.search.panel === "open");
+      if (!isPanelOpenParam) {
         setPanelOpen(false);
         if (panelRef.current) {
           panelRef.current.style.transform = "";
@@ -246,24 +232,21 @@ function RepositoryOfRemnantsPage() {
   }, []);
 
   useEffect(() => {
-    const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
     const t = search?.tab || (location?.search && location.search.tab);
     const isPanelOpenParam = search?.panel === "open" || (location?.search && location.search.panel === "open");
 
-    if (isPhone) {
-      // On phone view, do not auto-force open the glass panel on initial landing
-      if (t && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(t)) {
-        setActiveNavTab(t);
-      }
-      setPanelOpen(false);
-      return;
-    }
-
     if (t && ["explore", "stories", "recommendations", "messages", "profile", "lend"].includes(t)) {
       setActiveNavTab(t);
+    }
+
+    if (isPanelOpenParam) {
       setPanelOpen(true);
-    } else if (isPanelOpenParam) {
-      setPanelOpen(true);
+    } else {
+      setPanelOpen(false);
+      if (panelRef.current) {
+        panelRef.current.style.transform = "";
+        panelRef.current.style.transition = "";
+      }
     }
   }, [search?.tab, search?.panel, location?.search, location?.searchStr, location?.href]);
 
@@ -1009,9 +992,7 @@ function RepositoryOfRemnantsPage() {
       const scrollY = window.scrollY;
       const vh = window.innerHeight || 800;
       const progress = Math.min(1, Math.max(0, scrollY / vh));
-      const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
-
-      if (isPhone && scrollY < 50) {
+      if (scrollY < 20) {
         panelRef.current.style.transform = "";
         panelRef.current.style.transition = "none";
         return;
@@ -1131,12 +1112,12 @@ function RepositoryOfRemnantsPage() {
             to="/peek"
             search={{}}
             onClick={(e) => {
-              const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
-              if (isPhone) {
-                e.preventDefault();
-                setPanelOpen(false);
-              } else {
-                setActiveNavTab("explore");
+              e.preventDefault();
+              setPanelOpen(false);
+              window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+              if (panelRef.current) {
+                panelRef.current.style.transform = "";
+                panelRef.current.style.transition = "";
               }
             }}
             className="flex items-center gap-3 group cursor-pointer"
@@ -3257,13 +3238,12 @@ function RepositoryOfRemnantsPage() {
           onSuccess={(user) => {
             setStoredUser(user);
             setCurrentUser(user);
-            const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
             if (pendingActionAfterAuth === "lend") {
               setPendingActionAfterAuth(null);
               setActiveNavTab("lend");
               setPanelOpen(true);
-            } else if (isPhone) {
-              // On phone view, keep user on Welcome page
+            } else {
+              // On all devices (phone, iPad, desktop), return to Welcome to the Mohalla Store page
               setPanelOpen(false);
               window.scrollTo(0, 0);
               if (panelRef.current) {

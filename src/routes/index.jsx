@@ -357,30 +357,22 @@ function Index() {
                     Mohalla Store connects people living in the same neighbourhood, so they can borrow things they need and lend things they already have — because not everything needs to be bought new.
                   </p>
 
-                  {/* Take a Peek Button */}
-                  <div className="flex justify-center items-center pointer-events-auto mb-6">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
-                        if (isPhone) {
+                    {/* Take a Peek Button */}
+                    <div className="flex justify-center items-center pointer-events-auto mb-6">
+                      <button
+                        type="button"
+                        onClick={() => {
                           window.scrollTo({ top: 0, left: 0, behavior: "instant" });
                           navigate({
                             to: "/peek",
                             search: {},
                           });
-                        } else {
-                          navigate({
-                            to: "/peek",
-                            search: { tab: "explore", panel: "open" },
-                          });
-                        }
-                      }}
-                      className="btn-peek px-12 py-4 cursor-pointer"
-                    >
-                      TAKE A PEEK
-                    </button>
-                  </div>
+                        }}
+                        className="btn-peek px-12 py-4 cursor-pointer"
+                      >
+                        TAKE A PEEK
+                      </button>
+                    </div>
                 </div>
               ) : mode === "borrower" ? (
                 <div>
@@ -439,19 +431,11 @@ function Index() {
             backStack.dismiss("index_auth");
           }
           setShowAuthModal(false);
-          const isPhone = typeof window !== "undefined" && window.innerWidth < 768;
-          if (isPhone) {
-            window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-            navigate({
-              to: "/peek",
-              search: {},
-            });
-          } else {
-            navigate({
-              to: "/peek",
-              search: { tab: "explore", panel: "open" },
-            });
-          }
+          window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+          navigate({
+            to: "/peek",
+            search: {},
+          });
         }}
       />
     </main>
